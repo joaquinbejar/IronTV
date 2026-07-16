@@ -1,0 +1,5 @@
+[
+  { "category_id": 7, "category_name": "News", "parent_id": 0 },
+  { "category_id": 12, "category_name": "Sports", "parent_id": 0 },
+  { "category_id": 13, "category_name": "Sports HD", "parent_id": 12 }
+]

@@ -1,0 +1,1432 @@
+[
+  {
+    "category_id": "473",
+    "category_name": "Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "129",
+    "category_name": "ES - FUTBOL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "130",
+    "category_name": "ES - DEPORTES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "198",
+    "category_name": "ES - FORMULA 1",
+    "parent_id": 0
+  },
+  {
+    "category_id": "457",
+    "category_name": "ES - LIGA ACB",
+    "parent_id": 0
+  },
+  {
+    "category_id": "467",
+    "category_name": "ES - Liga de Campeones Femenina",
+    "parent_id": 0
+  },
+  {
+    "category_id": "471",
+    "category_name": "ES - UFC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "131",
+    "category_name": "ES - CINE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "133",
+    "category_name": "ES - ESTILO DE VIDA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "132",
+    "category_name": "ES - NINOS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "136",
+    "category_name": "ES - TDT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "134",
+    "category_name": "ES - CULTURA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "135",
+    "category_name": "ES - MUSICA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "197",
+    "category_name": "ES - FEF TV",
+    "parent_id": 0
+  },
+  {
+    "category_id": "237",
+    "category_name": "ES - SEGUNDA FEDERACION",
+    "parent_id": 0
+  },
+  {
+    "category_id": "340",
+    "category_name": "ES - Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "238",
+    "category_name": "ES - LALIGA+",
+    "parent_id": 0
+  },
+  {
+    "category_id": "458",
+    "category_name": "ES - NFL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "459",
+    "category_name": "ES - NBA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "205",
+    "category_name": "ES - ESTRENOS & SERIES 24/7",
+    "parent_id": 0
+  },
+  {
+    "category_id": "338",
+    "category_name": "ES - NETFLIX",
+    "parent_id": 0
+  },
+  {
+    "category_id": "301",
+    "category_name": "ES - TAQUILLAS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "460",
+    "category_name": "ES - OnePlay Cine",
+    "parent_id": 0
+  },
+  {
+    "category_id": "461",
+    "category_name": "ES - MoviStar+ Estrenos",
+    "parent_id": 0
+  },
+  {
+    "category_id": "462",
+    "category_name": "ES - MoviStar+ Series",
+    "parent_id": 0
+  },
+  {
+    "category_id": "463",
+    "category_name": "ES - Netflix Estrenos",
+    "parent_id": 0
+  },
+  {
+    "category_id": "464",
+    "category_name": "ES - Netflix Series",
+    "parent_id": 0
+  },
+  {
+    "category_id": "465",
+    "category_name": "ES - PrimeVideo Series",
+    "parent_id": 0
+  },
+  {
+    "category_id": "466",
+    "category_name": "ES - Apple TV+ Series",
+    "parent_id": 0
+  },
+  {
+    "category_id": "303",
+    "category_name": "ES - REPECTICION DE FUTBOL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "366",
+    "category_name": "ES - REPLAY MOTOGP 2025",
+    "parent_id": 0
+  },
+  {
+    "category_id": "365",
+    "category_name": "ES - REPLAY MOTOGP",
+    "parent_id": 0
+  },
+  {
+    "category_id": "364",
+    "category_name": "ES - REPLAY F1 HD 2025",
+    "parent_id": 0
+  },
+  {
+    "category_id": "363",
+    "category_name": "ES - REPLAY F1 HD",
+    "parent_id": 0
+  },
+  {
+    "category_id": "137",
+    "category_name": "UK - SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "204",
+    "category_name": "UK - SPORTS HEVC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "202",
+    "category_name": "UK - SKY SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "201",
+    "category_name": "UK - TNT SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "200",
+    "category_name": "UK - Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "166",
+    "category_name": "UK - EPL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "203",
+    "category_name": "UK - FORMULA 1",
+    "parent_id": 0
+  },
+  {
+    "category_id": "138",
+    "category_name": "UK - MOVIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "139",
+    "category_name": "UK - DOCUMENTARIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "146",
+    "category_name": "UK - ENTERTAINMENT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "239",
+    "category_name": "UK - SKY STORE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "143",
+    "category_name": "UK - NEWS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "142",
+    "category_name": "UK - MUSIC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "140",
+    "category_name": "UK - KIDS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "141",
+    "category_name": "UK - INTERNATIONAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "144",
+    "category_name": "UK - REGIONAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "145",
+    "category_name": "UK - BET",
+    "parent_id": 0
+  },
+  {
+    "category_id": "199",
+    "category_name": "UK - Sky Sports+ (ONLY EVENTS)",
+    "parent_id": 0
+  },
+  {
+    "category_id": "207",
+    "category_name": "UK - IRELAND",
+    "parent_id": 0
+  },
+  {
+    "category_id": "308",
+    "category_name": "UK - EPL REPLAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "278",
+    "category_name": "UK - VIAPLAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "280",
+    "category_name": "UK - STAR HUB",
+    "parent_id": 0
+  },
+  {
+    "category_id": "279",
+    "category_name": "UK - ASTRO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "276",
+    "category_name": "UK - OPTUS SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "277",
+    "category_name": "UK - NOWHK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "275",
+    "category_name": "UK - SETANTA SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "304",
+    "category_name": "UK - HULU ORIGINAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "310",
+    "category_name": "UK - DISNEY+ SERIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "309",
+    "category_name": "UK - APPLE TV+ SERIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "307",
+    "category_name": "UK - AMC+ ORIGINAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "305",
+    "category_name": "UK - HBOMAX ORIGINAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "306",
+    "category_name": "UK - AMAZONPRIME VIDEO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "282",
+    "category_name": "UK - RUGBY EVENTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "281",
+    "category_name": "UK - NI FL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "283",
+    "category_name": "UK - AMAZON EVENTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "339",
+    "category_name": "UK - DISCOVERY+ EVENTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "196",
+    "category_name": "SPFL PREMIERSHIP",
+    "parent_id": 0
+  },
+  {
+    "category_id": "250",
+    "category_name": "SPFL Championship",
+    "parent_id": 0
+  },
+  {
+    "category_id": "311",
+    "category_name": "NZ - SKY SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "147",
+    "category_name": "SOUTH AFRICA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "175",
+    "category_name": "DE - BASIC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "176",
+    "category_name": "DE - SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "177",
+    "category_name": "DE - NEWS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "174",
+    "category_name": "DE - MUSIK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "173",
+    "category_name": "DE - KINO/SERIEN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "172",
+    "category_name": "DE - KINDER",
+    "parent_id": 0
+  },
+  {
+    "category_id": "337",
+    "category_name": "DE - Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "336",
+    "category_name": "DE - RTL+ EVENT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "335",
+    "category_name": "DE - DYN SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "178",
+    "category_name": "AUSTRIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "433",
+    "category_name": "CH - SKY SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "343",
+    "category_name": "CH - BLUE SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "128",
+    "category_name": "SWITZERLAND",
+    "parent_id": 0
+  },
+  {
+    "category_id": "212",
+    "category_name": "IT - TIVU SAT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "101",
+    "category_name": "IT - SKY ITALIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "213",
+    "category_name": "IT - Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "443",
+    "category_name": "IT - PRIMAFILA & RAKUTEN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "444",
+    "category_name": "IT - TIMVISION EUROSPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "445",
+    "category_name": "IT - Sample Channel",
+    "parent_id": 0
+  },
+  {
+    "category_id": "334",
+    "category_name": "FR - LIGUE 1",
+    "parent_id": 0
+  },
+  {
+    "category_id": "446",
+    "category_name": "IT - LNP & NBA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "294",
+    "category_name": "FR - SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "295",
+    "category_name": "FR - CINEMA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "299",
+    "category_name": "FR - CULTURE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "296",
+    "category_name": "FR - GENERAL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "300",
+    "category_name": "FR - MUSIQUE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "298",
+    "category_name": "FR - ENFANTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "297",
+    "category_name": "FR - INFO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "453",
+    "category_name": "FR - BOUYGUES TELECOM",
+    "parent_id": 0
+  },
+  {
+    "category_id": "454",
+    "category_name": "FR - M6 PROGRAMMES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "455",
+    "category_name": "FR - TF1 PROGRAMMES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "103",
+    "category_name": "HOLLAND",
+    "parent_id": 0
+  },
+  {
+    "category_id": "319",
+    "category_name": "Polska - Kanały ogólnego",
+    "parent_id": 0
+  },
+  {
+    "category_id": "320",
+    "category_name": "Polska - Sportowe",
+    "parent_id": 0
+  },
+  {
+    "category_id": "321",
+    "category_name": "Polska - Filmy i Seriale",
+    "parent_id": 0
+  },
+  {
+    "category_id": "322",
+    "category_name": "Polska - Dokumenty i Kultura",
+    "parent_id": 0
+  },
+  {
+    "category_id": "323",
+    "category_name": "Polska - Informacyjne",
+    "parent_id": 0
+  },
+  {
+    "category_id": "324",
+    "category_name": "Polska - Dla dzieci i Muzyka",
+    "parent_id": 0
+  },
+  {
+    "category_id": "291",
+    "category_name": "PT - Internacionais",
+    "parent_id": 0
+  },
+  {
+    "category_id": "284",
+    "category_name": "PT - Desportos",
+    "parent_id": 0
+  },
+  {
+    "category_id": "285",
+    "category_name": "PT - Generalistas e cultura",
+    "parent_id": 0
+  },
+  {
+    "category_id": "286",
+    "category_name": "PT - Documentários",
+    "parent_id": 0
+  },
+  {
+    "category_id": "287",
+    "category_name": "PT - Filmes e Séries",
+    "parent_id": 0
+  },
+  {
+    "category_id": "288",
+    "category_name": "PT - Notícias",
+    "parent_id": 0
+  },
+  {
+    "category_id": "289",
+    "category_name": "PT - Infantil",
+    "parent_id": 0
+  },
+  {
+    "category_id": "290",
+    "category_name": "PT - Música",
+    "parent_id": 0
+  },
+  {
+    "category_id": "292",
+    "category_name": "PT - Entretenimento",
+    "parent_id": 0
+  },
+  {
+    "category_id": "293",
+    "category_name": "PT - Temáticos",
+    "parent_id": 0
+  },
+  {
+    "category_id": "116",
+    "category_name": "SWEDEN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "251",
+    "category_name": "AL - ALBANIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "253",
+    "category_name": "AL - FETARE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "254",
+    "category_name": "AL - FILMA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "255",
+    "category_name": "AL - LAJME 24H",
+    "parent_id": 0
+  },
+  {
+    "category_id": "256",
+    "category_name": "AL - MUZIKE FEMIJE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "257",
+    "category_name": "AL - SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "252",
+    "category_name": "AL - DOKUMENTARE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "259",
+    "category_name": "RO - Local și Regional",
+    "parent_id": 0
+  },
+  {
+    "category_id": "258",
+    "category_name": "RO - Interes General",
+    "parent_id": 0
+  },
+  {
+    "category_id": "260",
+    "category_name": "RO - Știri",
+    "parent_id": 0
+  },
+  {
+    "category_id": "266",
+    "category_name": "RO - Muzică",
+    "parent_id": 0
+  },
+  {
+    "category_id": "265",
+    "category_name": "RO - Copii",
+    "parent_id": 0
+  },
+  {
+    "category_id": "267",
+    "category_name": "RO - Religie",
+    "parent_id": 0
+  },
+  {
+    "category_id": "264",
+    "category_name": "RO - Filme și Seriale",
+    "parent_id": 0
+  },
+  {
+    "category_id": "261",
+    "category_name": "RO - Sport",
+    "parent_id": 0
+  },
+  {
+    "category_id": "262",
+    "category_name": "RO - Stil de Viață",
+    "parent_id": 0
+  },
+  {
+    "category_id": "263",
+    "category_name": "RO - Documentare",
+    "parent_id": 0
+  },
+  {
+    "category_id": "248",
+    "category_name": "TR - SPOR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "246",
+    "category_name": "TR - MUZIK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "247",
+    "category_name": "TR - SINEMA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "242",
+    "category_name": "TR - DINI",
+    "parent_id": 0
+  },
+  {
+    "category_id": "243",
+    "category_name": "TR - ULUSAL - HABER - YORESEL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "240",
+    "category_name": "TR - BELGESEL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "344",
+    "category_name": "Greece - Kids",
+    "parent_id": 0
+  },
+  {
+    "category_id": "345",
+    "category_name": "Greece - Sports",
+    "parent_id": 0
+  },
+  {
+    "category_id": "346",
+    "category_name": "Greece - Music",
+    "parent_id": 0
+  },
+  {
+    "category_id": "347",
+    "category_name": "Greece - News",
+    "parent_id": 0
+  },
+  {
+    "category_id": "348",
+    "category_name": "Greece - Movie",
+    "parent_id": 0
+  },
+  {
+    "category_id": "349",
+    "category_name": "Greece - LifeStyle",
+    "parent_id": 0
+  },
+  {
+    "category_id": "350",
+    "category_name": "Greece - Nature",
+    "parent_id": 0
+  },
+  {
+    "category_id": "351",
+    "category_name": "Greece - Documentary",
+    "parent_id": 0
+  },
+  {
+    "category_id": "352",
+    "category_name": "Greece",
+    "parent_id": 0
+  },
+  {
+    "category_id": "353",
+    "category_name": "Bulgaria - Kids",
+    "parent_id": 0
+  },
+  {
+    "category_id": "354",
+    "category_name": "Bulgaria - Sports",
+    "parent_id": 0
+  },
+  {
+    "category_id": "355",
+    "category_name": "Bulgaria - Motor Sports",
+    "parent_id": 0
+  },
+  {
+    "category_id": "356",
+    "category_name": "Bulgaria - Music",
+    "parent_id": 0
+  },
+  {
+    "category_id": "357",
+    "category_name": "Bulgaria - News",
+    "parent_id": 0
+  },
+  {
+    "category_id": "358",
+    "category_name": "Bulgaria - Movie",
+    "parent_id": 0
+  },
+  {
+    "category_id": "359",
+    "category_name": "Bulgaria - LifeStyle",
+    "parent_id": 0
+  },
+  {
+    "category_id": "360",
+    "category_name": "Bulgaria - Nature",
+    "parent_id": 0
+  },
+  {
+    "category_id": "361",
+    "category_name": "Bulgaria - Documentary",
+    "parent_id": 0
+  },
+  {
+    "category_id": "362",
+    "category_name": "Bulgaria",
+    "parent_id": 0
+  },
+  {
+    "category_id": "123",
+    "category_name": "ALBANIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "111",
+    "category_name": "EX-YU",
+    "parent_id": 0
+  },
+  {
+    "category_id": "117",
+    "category_name": "BOSNA / HERSEK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "107",
+    "category_name": "CZECH",
+    "parent_id": 0
+  },
+  {
+    "category_id": "126",
+    "category_name": "HUNGARIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "110",
+    "category_name": "PAKISTANI",
+    "parent_id": 0
+  },
+  {
+    "category_id": "109",
+    "category_name": "INDIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "474",
+    "category_name": "ARABIC - BEIN WORLD CUP 2026",
+    "parent_id": 0
+  },
+  {
+    "category_id": "236",
+    "category_name": "AR - GOBOX",
+    "parent_id": 0
+  },
+  {
+    "category_id": "124",
+    "category_name": "ARABIC - BEIN SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "219",
+    "category_name": "AR - KSA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "234",
+    "category_name": "AR - JORDANIE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "235",
+    "category_name": "AR - KUWAIT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "214",
+    "category_name": "AR - MOROCCO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "215",
+    "category_name": "AR - ALGERIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "233",
+    "category_name": "AR - EGYPTE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "216",
+    "category_name": "AR - TUNISIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "218",
+    "category_name": "AR - LEBANON",
+    "parent_id": 0
+  },
+  {
+    "category_id": "217",
+    "category_name": "AR - LIBYA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "227",
+    "category_name": "AR - SSC & AD PREMIUM",
+    "parent_id": 0
+  },
+  {
+    "category_id": "220",
+    "category_name": "AR - QATAR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "221",
+    "category_name": "AR - UAE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "231",
+    "category_name": "AR - ISLAMIC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "230",
+    "category_name": "AR - ROTANA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "229",
+    "category_name": "AR - YEMEN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "228",
+    "category_name": "AR - SYRIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "226",
+    "category_name": "AR - MBC CHANNELS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "225",
+    "category_name": "AR - OSN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "224",
+    "category_name": "AR - BAHRAIN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "223",
+    "category_name": "AR - IRAK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "222",
+    "category_name": "AR - OMAN",
+    "parent_id": 0
+  },
+  {
+    "category_id": "209",
+    "category_name": "SERBIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "210",
+    "category_name": "CROATIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "165",
+    "category_name": "ARGENTINA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "156",
+    "category_name": "MEXICO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "157",
+    "category_name": "COLUMBIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "164",
+    "category_name": "URUGUAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "162",
+    "category_name": "ECUADOR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "161",
+    "category_name": "PERU",
+    "parent_id": 0
+  },
+  {
+    "category_id": "106",
+    "category_name": "BRAZIL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "160",
+    "category_name": "CHILE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "158",
+    "category_name": "BOLIVIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "192",
+    "category_name": "REPUBLICA DOMINICANA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "191",
+    "category_name": "COSTA RICA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "193",
+    "category_name": "VENEZUELA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "179",
+    "category_name": "LATINO - DEPORTE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "190",
+    "category_name": "LATINO - INFANTILE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "189",
+    "category_name": "LATINO - CULTURALE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "180",
+    "category_name": "LATINO - CINE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "194",
+    "category_name": "LATINO - 24/7 SERIES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "114",
+    "category_name": "ADULTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "367",
+    "category_name": "US - DirecTV",
+    "parent_id": 0
+  },
+  {
+    "category_id": "368",
+    "category_name": "US - DirectTV Locals",
+    "parent_id": 0
+  },
+  {
+    "category_id": "369",
+    "category_name": "US - Spectrum",
+    "parent_id": 0
+  },
+  {
+    "category_id": "370",
+    "category_name": "US - ESPN Soccer",
+    "parent_id": 0
+  },
+  {
+    "category_id": "371",
+    "category_name": "US - TrillerTV",
+    "parent_id": 0
+  },
+  {
+    "category_id": "372",
+    "category_name": "US - Entertainment",
+    "parent_id": 0
+  },
+  {
+    "category_id": "373",
+    "category_name": "US - Movies",
+    "parent_id": 0
+  },
+  {
+    "category_id": "374",
+    "category_name": "US - Kids",
+    "parent_id": 0
+  },
+  {
+    "category_id": "375",
+    "category_name": "US - Factual",
+    "parent_id": 0
+  },
+  {
+    "category_id": "376",
+    "category_name": "US - Sports",
+    "parent_id": 0
+  },
+  {
+    "category_id": "377",
+    "category_name": "US - News",
+    "parent_id": 0
+  },
+  {
+    "category_id": "378",
+    "category_name": "US - Spanish",
+    "parent_id": 0
+  },
+  {
+    "category_id": "379",
+    "category_name": "US - Locals",
+    "parent_id": 0
+  },
+  {
+    "category_id": "208",
+    "category_name": "MLS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "167",
+    "category_name": "NBA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "168",
+    "category_name": "NFL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "170",
+    "category_name": "MLB",
+    "parent_id": 0
+  },
+  {
+    "category_id": "181",
+    "category_name": "PPV - SPORT",
+    "parent_id": 0
+  },
+  {
+    "category_id": "195",
+    "category_name": "PEACOCK",
+    "parent_id": 0
+  },
+  {
+    "category_id": "113",
+    "category_name": "CANADA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "384",
+    "category_name": "LAT - 24/7 COMEDIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "385",
+    "category_name": "LAT - 24/7 DRAMA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "386",
+    "category_name": "LAT - 24/7 TERROR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "387",
+    "category_name": "LAT - 24/7 CIENCIA FICCION",
+    "parent_id": 0
+  },
+  {
+    "category_id": "388",
+    "category_name": "LAT - 24/7 ACCION",
+    "parent_id": 0
+  },
+  {
+    "category_id": "389",
+    "category_name": "LAT - 24/7 INFANTIL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "390",
+    "category_name": "LAT - 24/7 FAMILIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "391",
+    "category_name": "LAT - CINE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "394",
+    "category_name": "LAT - MEXICO DEPORTES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "395",
+    "category_name": "LAT - ENTRETENIMIENTO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "397",
+    "category_name": "LAT - CULTURALES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "398",
+    "category_name": "LAT - MEXICO CULTURALES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "399",
+    "category_name": "LAT - MEXICO ENTRETENIMIENTO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "400",
+    "category_name": "LAT - ARGENTINA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "402",
+    "category_name": "LAT - MEXICO CINE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "404",
+    "category_name": "LAT - INFANTIL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "405",
+    "category_name": "LAT - MUSICA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "406",
+    "category_name": "LAT - DEPORTES",
+    "parent_id": 0
+  },
+  {
+    "category_id": "407",
+    "category_name": "LAT - NOTICIAS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "408",
+    "category_name": "LAT - BOLIVIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "409",
+    "category_name": "LAT - MEXICO INFANTIL",
+    "parent_id": 0
+  },
+  {
+    "category_id": "410",
+    "category_name": "LAT - CHILE",
+    "parent_id": 0
+  },
+  {
+    "category_id": "411",
+    "category_name": "LAT - COLOMBIA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "412",
+    "category_name": "LAT - COSTA RICA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "413",
+    "category_name": "LAT - CUBA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "414",
+    "category_name": "LAT - ECUADOR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "415",
+    "category_name": "LAT - RELIGIOSOS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "416",
+    "category_name": "LAT - GALAVISION",
+    "parent_id": 0
+  },
+  {
+    "category_id": "417",
+    "category_name": "LAT - GUATEMALA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "418",
+    "category_name": "LAT - HONDURAS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "420",
+    "category_name": "LAT - MEXICO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "421",
+    "category_name": "LAT - NICARAGUA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "422",
+    "category_name": "LAT - PANAMA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "423",
+    "category_name": "LAT - PERU",
+    "parent_id": 0
+  },
+  {
+    "category_id": "424",
+    "category_name": "LAT - PUERTO RICO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "425",
+    "category_name": "LAT - PARAGUAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "426",
+    "category_name": "LAT - REPUBLICA DOMINICANA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "427",
+    "category_name": "LAT - EL SALVADOR",
+    "parent_id": 0
+  },
+  {
+    "category_id": "428",
+    "category_name": "LAT - TELEMUNDO",
+    "parent_id": 0
+  },
+  {
+    "category_id": "429",
+    "category_name": "LAT - UNIMAS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "430",
+    "category_name": "LAT - UNIVISION",
+    "parent_id": 0
+  },
+  {
+    "category_id": "431",
+    "category_name": "LAT - URUGUAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "432",
+    "category_name": "LAT - VENEZUELA",
+    "parent_id": 0
+  },
+  {
+    "category_id": "434",
+    "category_name": "AR - NEWS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "435",
+    "category_name": "AR - MUSIC",
+    "parent_id": 0
+  },
+  {
+    "category_id": "436",
+    "category_name": "AR - KIDS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "437",
+    "category_name": "AR - SPORTS",
+    "parent_id": 0
+  },
+  {
+    "category_id": "438",
+    "category_name": "AR - BEIN Entertainment",
+    "parent_id": 0
+  },
+  {
+    "category_id": "456",
+    "category_name": "NL - VIAPLAY",
+    "parent_id": 0
+  },
+  {
+    "category_id": "472",
+    "category_name": "SUPERBOWL",
+    "parent_id": 0
+  }
+]

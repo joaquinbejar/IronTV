@@ -1,0 +1,30 @@
+[
+  {
+    "num": 1,
+    "name": "News Channel One",
+    "stream_type": "live",
+    "stream_id": 1001,
+    "stream_icon": "http://cdn.example.com/logos/news1.png",
+    "epg_channel_id": "news1.example",
+    "added": 1704067200,
+    "category_id": 7,
+    "custom_sid": "",
+    "tv_archive": 0,
+    "direct_source": "",
+    "tv_archive_duration": 0
+  },
+  {
+    "num": 2,
+    "name": "Sports Channel",
+    "stream_type": "live",
+    "stream_id": 1002,
+    "stream_icon": "",
+    "epg_channel_id": null,
+    "added": 1704067200,
+    "category_id": 12,
+    "custom_sid": null,
+    "tv_archive": 1,
+    "direct_source": "",
+    "tv_archive_duration": 24
+  }
+]
