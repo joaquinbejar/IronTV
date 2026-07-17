@@ -24,7 +24,17 @@ final class AppModel: ObservableObject {
     }
 
     func removeAccount() throws {
+        if account == DemoMode.account {
+            account = nil // sample mode isn't persisted; just exit it
+            return
+        }
         try store.deleteAccount()
         account = nil
+    }
+
+    /// User-facing "Sample channels": browse and play legal public streams
+    /// without a subscription. Not persisted to the Keychain.
+    func startSampleMode() {
+        account = DemoMode.account
     }
 }

@@ -58,9 +58,23 @@ enum DemoMode {
         categories.flatMap { streams(in: .category($0.id)) }
     }
 
-    /// Bundled sample clip so the player screen shows real playback UI.
-    static var sampleStreamURL: URL {
+    /// Bundled clip used for App Store screenshots (IRONTV_DEMO env).
+    static var screenshotClipURL: URL {
         Bundle.main.url(forResource: "demo_stream", withExtension: "mp4")
             ?? URL(string: "http://demo.irontv.local/none.m3u8")!
+    }
+
+    /// Public, legal HLS streams used by the user-facing "Sample channels"
+    /// mode so the app (and an App Store reviewer) can play real content
+    /// without a subscription. Apple / Mux / Unified Streaming test assets.
+    static let sampleStreamURLs: [URL] = [
+        URL(string: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8")!,
+        URL(string: "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8")!,
+        URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8")!,
+        URL(string: "https://test-streams.mux.dev/pts_shift/master.m3u8")!,
+    ]
+
+    static func sampleURL(for streamID: StreamID) -> URL {
+        sampleStreamURLs[abs(streamID.rawValue) % sampleStreamURLs.count]
     }
 }

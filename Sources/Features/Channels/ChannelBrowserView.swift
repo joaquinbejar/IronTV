@@ -230,7 +230,7 @@ struct ChannelBrowserView: View {
             // Play the bundled demo clip directly — avoids the async
             // stream-load race that would leave the player idle.
             if let stream = DemoMode.streams(in: .category(CategoryID(2))).first(where: { $0.name == "Match Day FHD" }) {
-                player.play(stream, url: DemoMode.sampleStreamURL)
+                player.play(stream, url: DemoMode.screenshotClipURL)
             }
         #if !os(macOS)
         case "settings":

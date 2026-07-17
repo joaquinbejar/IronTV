@@ -39,7 +39,7 @@ targets:
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "15"
+        CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.video
@@ -91,7 +91,7 @@ targets:
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "15"
+        CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
@@ -139,7 +139,7 @@ targets:
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "15"
+        CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:

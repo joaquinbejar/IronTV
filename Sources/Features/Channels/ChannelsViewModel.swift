@@ -42,14 +42,17 @@ final class ChannelsViewModel: ObservableObject {
     /// Stream to re-select once its category's streams arrive (launch restore).
     private var pendingStreamRestore: StreamID?
 
-    private let isDemo = DemoMode.isActive
+    /// True for the demo catalog: the screenshot env flag OR the user-facing
+    /// "Sample channels" account.
+    private let isDemo: Bool
 
     init(account: Account, lastChannel: LastChannelStore = LastChannelStore()) {
         let settings = PlaybackSettingsStore().load()
         self.client = XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
         self.lastChannel = lastChannel
         self.favoritesStore = FavoritesStore(account: account)
-        self.favorites = DemoMode.isActive ? DemoMode.favoriteIDs : favoritesStore.load()
+        self.isDemo = DemoMode.isActive || account == DemoMode.account
+        self.favorites = isDemo ? DemoMode.favoriteIDs : favoritesStore.load()
         Task { await loadCategories() }
     }
 
@@ -82,7 +85,11 @@ final class ChannelsViewModel: ObservableObject {
     }
 
     func playbackURL(for streamID: StreamID) throws -> URL {
-        if isDemo { return DemoMode.sampleStreamURL }
+        if isDemo {
+            // Screenshots play the bundled poster clip; the user-facing
+            // sample mode plays real legal HLS streams.
+            return DemoMode.isActive ? DemoMode.screenshotClipURL : DemoMode.sampleURL(for: streamID)
+        }
         return try client.playbackURL(for: streamID)
     }
 

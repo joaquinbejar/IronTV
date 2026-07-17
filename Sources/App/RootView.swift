@@ -38,6 +38,7 @@ struct RootView: View {
 
 /// Empty state shown until the user configures an account in Settings.
 private struct NoAccountView: View {
+    @EnvironmentObject private var appModel: AppModel
     var openSettingsFallback: () -> Void = {}
 
     var body: some View {
@@ -51,6 +52,14 @@ private struct NoAccountView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             OpenSettingsButton(fallbackAction: openSettingsFallback)
+            Button("Try Sample Channels") {
+                appModel.startSampleMode()
+            }
+            .buttonStyle(.bordered)
+            Text("Sample channels play free public demo streams — no subscription needed.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding(40)
     }
