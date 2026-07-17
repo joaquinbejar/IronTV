@@ -6,7 +6,7 @@
 Sources/Info.plist
 Sources/Info-iOS.plist
 Sources/Info-tvOS.plist
-Sources/IronTV.entitlements
+Sources/*.entitlements
 
 # Xcode / build
 DerivedData/

@@ -38,8 +38,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "0.1.9"
-        CFBundleVersion: "10"
+        CFBundleShortVersionString: "0.1.10"
+        CFBundleVersion: "11"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         LSApplicationCategoryType: public.app-category.video
         NSAppTransportSecurity:
@@ -84,10 +84,9 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        # Flip to true once the iCloud KVS entitlement is provisioned.
-        IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "0.1.9"
-        CFBundleVersion: "10"
+        IronTVCloudKVSEnabled: true
+        CFBundleShortVersionString: "0.1.10"
+        CFBundleVersion: "11"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -103,6 +102,12 @@ targets:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
+    entitlements:
+      path: Sources/IronTV-iOS.entitlements
+      properties:
+        # iCloud key-value store: syncs playback settings/favorites/last
+        # channel. Xcode automatic signing registers the capability.
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.quantkernel.irontv
@@ -126,15 +131,18 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        # Flip to true once the iCloud KVS entitlement is provisioned.
-        IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "0.1.9"
-        CFBundleVersion: "10"
+        IronTVCloudKVSEnabled: true
+        CFBundleShortVersionString: "0.1.10"
+        CFBundleVersion: "11"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
+    entitlements:
+      path: Sources/IronTV-tvOS.entitlements
+      properties:
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.quantkernel.irontv
