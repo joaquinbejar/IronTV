@@ -9,6 +9,9 @@ struct PlayerView: View {
     /// Invoked when the user asks for full screen, before the window toggles,
     /// so the browser chrome can hide without waiting for AppKit notifications.
     var onWillToggleFullScreen: (() -> Void)? = nil
+    /// macOS floating mini-player toggle; the toolbar button only appears
+    /// when this is provided.
+    var onToggleFloating: (() -> Void)? = nil
     /// Full-screen mode: no navigation title, no toolbar, edge-to-edge video.
     var hidesChrome: Bool = false
 
@@ -47,6 +50,15 @@ struct PlayerView: View {
                         .disabled(viewModel.currentStream == nil)
                     }
                     #if os(macOS)
+                    if let onToggleFloating {
+                        ToolbarItem {
+                            Button(action: onToggleFloating) {
+                                Image(systemName: "pip.swap")
+                            }
+                            .help("Floating mini player (always on top)")
+                            .disabled(viewModel.currentStream == nil)
+                        }
+                    }
                     ToolbarItem {
                         Button(action: toggleFullScreen) {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -123,17 +135,8 @@ struct PlayerView: View {
         }
     }
 
-    @ViewBuilder
     private var videoSurface: some View {
-        #if canImport(VLCKitSPM)
-        if viewModel.engine == .vlc {
-            VLCPlayerSurface(viewModel: viewModel)
-        } else {
-            PlayerSurface(player: viewModel.player)
-        }
-        #else
-        PlayerSurface(player: viewModel.player)
-        #endif
+        EngineVideoSurface(viewModel: viewModel)
     }
 
     private func toggleFullScreen() {

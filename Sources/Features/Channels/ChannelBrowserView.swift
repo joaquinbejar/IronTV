@@ -19,6 +19,9 @@ struct ChannelBrowserView: View {
     #if os(tvOS)
     @State private var tvPath = NavigationPath()
     #endif
+    #if os(macOS)
+    @StateObject private var floatingManager = FloatingPlayerManager()
+    #endif
 
     init(account: Account) {
         _channels = StateObject(wrappedValue: ChannelsViewModel(account: account))
@@ -45,6 +48,9 @@ struct ChannelBrowserView: View {
                 #endif
             }
             .onDisappear {
+                #if os(macOS)
+                floatingManager.exitIfNeeded(viewModel: player)
+                #endif
                 player.stop()
             }
             #if os(macOS)
@@ -203,7 +209,15 @@ struct ChannelBrowserView: View {
                 channelColumn
                     .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             } detail: {
+                #if os(macOS)
+                PlayerView(
+                    viewModel: player,
+                    onWillToggleFullScreen: playerWillToggleFullScreen,
+                    onToggleFloating: { floatingManager.toggle(with: player) }
+                )
+                #else
                 PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
+                #endif
             }
             #endif
         }
