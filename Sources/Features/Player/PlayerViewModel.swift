@@ -83,6 +83,7 @@ final class PlayerViewModel: ObservableObject {
     private var frozenSeconds: TimeInterval = 0
     private var waitingSince: Date?
     private var reconnectAttempts = 0
+    private var lastReconnectAt: Date?
     /// Detects frozen *video* — audio can keep playing (clock advances) while
     /// the video track is stuck, which the currentTime check can't see.
     private var videoOutput: AVPlayerItemVideoOutput?
@@ -120,6 +121,7 @@ final class PlayerViewModel: ObservableObject {
     /// look like AppleCoreMedia, which is exactly AVPlayer's default.
     func play(_ stream: LiveStream, url: URL) {
         reconnectAttempts = 0
+        lastReconnectAt = nil
         #if canImport(VLCKitSPM)
         if vlcOnlyStreams.contains(stream.id) {
             startVLCPlayback(stream, url: url, as: .loading)
@@ -375,16 +377,26 @@ final class PlayerViewModel: ObservableObject {
     }
 
     /// Tears the item down and reopens the stream URL — the panel issues a
-    /// fresh playback token on every connection.
+    /// fresh playback token on every connection. Live streams never give up:
+    /// after a burst of fast retries it backs off but keeps trying silently,
+    /// so a temporarily-dropped channel resumes on its own with no prompt.
     private func reconnect() {
         guard let currentStream, let currentURL else { return }
         reconnectAttempts += 1
-        guard reconnectAttempts <= settings.maxReconnectAttempts else {
-            watchdog?.invalidate()
-            watchdog = nil
-            state = .failed("Lost connection to the stream. Press Retry to reconnect.")
+
+        // Immediate for the first few attempts, then a capped backoff. The
+        // watchdog keeps calling us; we no-op (staying in .reconnecting) until
+        // enough time has passed for the next attempt.
+        let backoff: TimeInterval = reconnectAttempts <= settings.maxReconnectAttempts
+            ? 0
+            : min(Double(reconnectAttempts - settings.maxReconnectAttempts) * 3, 15)
+        let now = Date()
+        if backoff > 0, let last = lastReconnectAt, now.timeIntervalSince(last) < backoff {
+            state = .reconnecting
             return
         }
+        lastReconnectAt = now
+
         #if canImport(VLCKitSPM)
         if engine == .vlc {
             startVLCPlayback(currentStream, url: currentURL, as: .reconnecting)
@@ -433,8 +445,11 @@ final class PlayerViewModel: ObservableObject {
         return nsError.localizedDescription
     }
 
+    /// A live stream that drops is always recoverable — keep reconnecting
+    /// silently. Only surface a failure when there is genuinely nothing to
+    /// reconnect to (no stream/URL, or a codec even VLC can't decode).
     private func reconnectOrFail(_ message: String) {
-        if reconnectAttempts < settings.maxReconnectAttempts, currentStream != nil, currentURL != nil {
+        if currentStream != nil, currentURL != nil {
             reconnect()
         } else {
             state = .failed(message)

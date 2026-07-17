@@ -32,7 +32,9 @@ struct PlayerView: View {
         // is torn down mid-playback.
         core
             .ignoresSafeArea(.all, edges: chromeHidden ? .all : [])
-            .navigationTitle(viewModel.currentStream?.name ?? "IronTV")
+            // No navigation title in full screen — on tvOS it renders a large
+            // channel-name overlay across the video.
+            .navigationTitle(chromeHidden ? "" : (viewModel.currentStream?.name ?? "IronTV"))
             .toolbar {
                 if !chromeHidden {
                     ToolbarItem {
@@ -54,6 +56,9 @@ struct PlayerView: View {
                     #endif
                 }
             }
+        #if os(tvOS)
+            .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
+        #endif
         #if os(iOS)
             .statusBarHidden(chromeHidden)
             .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
