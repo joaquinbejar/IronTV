@@ -38,8 +38,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "0.1.12"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "0.1.13"
+        CFBundleVersion: "14"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         LSApplicationCategoryType: public.app-category.video
         NSAppTransportSecurity:
@@ -49,7 +49,11 @@ targets:
     entitlements:
       path: Sources/IronTV.entitlements
       properties:
-        com.apple.security.app-sandbox: true
+        # No App Sandbox for Developer ID / DMG distribution: a sandboxed app
+        # copied by another sandboxed process gets tagged "File created by an
+        # AppSandbox, exec/open not allowed" and won't launch. Hardened Runtime
+        # + notarization is what Developer ID needs. (Re-add the sandbox in a
+        # separate entitlements file when building for the Mac App Store.)
         com.apple.security.network.client: true
     settings:
       base:
@@ -85,8 +89,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "0.1.12"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "0.1.13"
+        CFBundleVersion: "14"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -132,8 +136,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "0.1.12"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "0.1.13"
+        CFBundleVersion: "14"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
