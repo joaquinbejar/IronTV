@@ -3,7 +3,34 @@ import SwiftUI
 /// Shown in the macOS Settings scene (Cmd+,). Pure SwiftUI so the same forms
 /// can later be presented as sheets or tabs on iOS.
 struct SettingsView: View {
+    #if !os(macOS)
+    @Environment(\.dismiss) private var dismiss
+    #endif
+
     var body: some View {
+        #if os(macOS)
+        settingsTabs
+            .frame(minWidth: 520, minHeight: 340)
+        #else
+        // Presented as a sheet on iOS/tvOS — needs its own Done button.
+        NavigationStack {
+            settingsTabs
+                .navigationTitle("Settings")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                }
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+        }
+        #endif
+    }
+
+    private var settingsTabs: some View {
         TabView {
             AccountSettingsTab()
                 .tabItem { Label("Account", systemImage: "person.crop.circle") }
@@ -12,7 +39,6 @@ struct SettingsView: View {
             LicenseTab()
                 .tabItem { Label("License", systemImage: "doc.text") }
         }
-        .frame(minWidth: 520, minHeight: 340)
     }
 }
 

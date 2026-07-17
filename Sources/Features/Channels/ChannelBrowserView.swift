@@ -12,6 +12,9 @@ struct ChannelBrowserView: View {
     #if !os(macOS)
     @State private var showingSettings = false
     #endif
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     init(account: Account) {
         _channels = StateObject(wrappedValue: ChannelsViewModel(account: account))
@@ -20,12 +23,15 @@ struct ChannelBrowserView: View {
     var body: some View {
         content
             .onChange(of: channels.selectedStreamID) { streamID in
+                // tvOS navigates by pushing screens; playback starts there.
+                #if !os(tvOS)
                 guard let streamID, let stream = channels.selectedStream() else { return }
                 do {
                     player.play(stream, url: try channels.playbackURL(for: streamID))
                 } catch {
                     player.fail(error)
                 }
+                #endif
             }
             .onDisappear {
                 player.stop()
@@ -45,8 +51,68 @@ struct ChannelBrowserView: View {
     /// In full screen the split view is replaced by the bare player — video
     /// only, no columns, no toolbar. macOS can't collapse the content column
     /// of a NavigationSplitView, so swapping the hierarchy is the reliable way.
+    /// tvOS gets a full-screen navigation stack instead of columns.
     @ViewBuilder
     private var content: some View {
+        #if os(tvOS)
+        tvContent
+        #else
+        desktopContent
+        #endif
+    }
+
+    #if os(tvOS)
+    private var tvContent: some View {
+        NavigationStack {
+            Group {
+                switch channels.categoriesPhase {
+                case .loading:
+                    ProgressView("Loading categories…")
+                case .failed(let message):
+                    LoadFailureView(message: message) {
+                        Task { await channels.loadCategories() }
+                    }
+                case .loaded:
+                    List {
+                        NavigationLink {
+                            TVChannelListScreen(channels: channels, player: player, selection: .all, title: "All Channels")
+                        } label: {
+                            Label("All Channels", systemImage: "square.grid.2x2")
+                        }
+                        NavigationLink {
+                            TVChannelListScreen(channels: channels, player: player, selection: .favorites, title: "Favorites")
+                        } label: {
+                            Label("Favorites", systemImage: "star")
+                        }
+                        Section("Categories") {
+                            ForEach(channels.categories) { category in
+                                NavigationLink(category.name) {
+                                    TVChannelListScreen(channels: channels, player: player, selection: .category(category.id), title: category.name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("IronTV")
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+    }
+    #endif
+
+    @ViewBuilder
+    private var desktopContent: some View {
         if isFullScreen {
             PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen, hidesChrome: true)
                 .windowToolbarHidden(true)
@@ -70,6 +136,17 @@ struct ChannelBrowserView: View {
                     .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             } detail: {
                 PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
+                #if os(iOS)
+                    .onDisappear {
+                        // iPhone (compact width): popping back to the channel
+                        // list unmounts the player — stop the audio and clear
+                        // the selection so re-tapping the same channel works.
+                        if horizontalSizeClass == .compact {
+                            player.stop()
+                            channels.selectedStreamID = nil
+                        }
+                    }
+                #endif
             }
             #if !os(macOS)
             .sheet(isPresented: $showingSettings) {
@@ -177,25 +254,21 @@ private struct ChannelRow: View {
             Spacer()
 
             #if os(tvOS)
-            // No context menus on tvOS 16 — a focusable star button instead.
+            // Rows are single focusables on tvOS — the star is an indicator;
+            // toggling happens via long-press menu or the play/pause button.
+            Image(systemName: isFavorite ? "star.fill" : "star")
+                .foregroundStyle(isFavorite ? .yellow : .secondary)
+            #else
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "star.fill" : "star")
                     .foregroundStyle(isFavorite ? .yellow : .secondary)
             }
-            .buttonStyle(.plain)
-            #else
-            if isFavorite {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(.yellow)
-                    .imageScale(.small)
-            }
+            .buttonStyle(.borderless)
             #endif
         }
-        #if !os(tvOS)
         .contextMenu {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", action: toggleFavorite)
         }
-        #endif
     }
 }
 
@@ -210,6 +283,87 @@ private extension View {
         #endif
     }
 }
+
+#if os(tvOS)
+/// Full-screen channel list for one category scope, pushed from the
+/// categories screen. Selecting a channel pushes the full-screen player.
+private struct TVChannelListScreen: View {
+    @ObservedObject var channels: ChannelsViewModel
+    @ObservedObject var player: PlayerViewModel
+    let selection: CategorySelection
+    let title: String
+
+    var body: some View {
+        Group {
+            switch channels.streamsPhase {
+            case .loading:
+                ProgressView("Loading channels…")
+            case .failed(let message):
+                LoadFailureView(message: message) {
+                    Task { await channels.loadStreams(bypassCache: true) }
+                }
+            case .loaded:
+                if selection == .favorites && channels.streams.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "star")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.secondary)
+                        Text("No favorites yet")
+                            .font(.headline)
+                        Text("Focus a channel and press the star to add it.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    List(channels.filteredStreams) { stream in
+                        NavigationLink {
+                            TVPlayerScreen(channels: channels, player: player, stream: stream)
+                        } label: {
+                            ChannelRow(
+                                stream: stream,
+                                isFavorite: channels.isFavorite(stream.id),
+                                toggleFavorite: { channels.toggleFavorite(stream.id) }
+                            )
+                        }
+                        // Play/pause on the remote toggles favorite on the
+                        // focused row; long-press opens the context menu.
+                        .onPlayPauseCommand {
+                            channels.toggleFavorite(stream.id)
+                        }
+                    }
+                    .searchable(text: $channels.searchText, prompt: "Search channels")
+                }
+            }
+        }
+        .navigationTitle(title)
+        .onAppear {
+            channels.selectedCategory = selection
+        }
+    }
+}
+
+/// Full-screen playback; the Menu button pops back and stops the stream.
+private struct TVPlayerScreen: View {
+    @ObservedObject var channels: ChannelsViewModel
+    @ObservedObject var player: PlayerViewModel
+    let stream: LiveStream
+
+    var body: some View {
+        PlayerView(viewModel: player, hidesChrome: true)
+            .ignoresSafeArea()
+            .onAppear {
+                channels.selectedStreamID = stream.id // remembers last channel
+                do {
+                    player.play(stream, url: try channels.playbackURL(for: stream.id))
+                } catch {
+                    player.fail(error)
+                }
+            }
+            .onDisappear {
+                player.stop()
+            }
+    }
+}
+#endif
 
 private struct LoadFailureView: View {
     let message: String

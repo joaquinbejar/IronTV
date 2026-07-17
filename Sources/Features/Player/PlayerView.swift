@@ -12,13 +12,29 @@ struct PlayerView: View {
     /// Full-screen mode: no navigation title, no toolbar, edge-to-edge video.
     var hidesChrome: Bool = false
 
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
+
+    /// iPhone landscape (compact vertical size class) is full-screen video —
+    /// no explicit toggle needed, just rotate the phone.
+    private var chromeHidden: Bool {
+        #if os(iOS)
+        return hidesChrome || verticalSizeClass == .compact
+        #else
+        return hidesChrome
+        #endif
+    }
+
     var body: some View {
-        if hidesChrome {
-            core.ignoresSafeArea()
-        } else {
-            core
-                .navigationTitle(viewModel.currentStream?.name ?? "IronTV")
-                .toolbar {
+        // One stable hierarchy: branching here would recreate the video
+        // surface on rotation and VLC's output goes black when its drawable
+        // is torn down mid-playback.
+        core
+            .ignoresSafeArea(.all, edges: chromeHidden ? .all : [])
+            .navigationTitle(viewModel.currentStream?.name ?? "IronTV")
+            .toolbar {
+                if !chromeHidden {
                     ToolbarItem {
                         Button {
                             viewModel.resyncToLive()
@@ -37,12 +53,25 @@ struct PlayerView: View {
                     }
                     #endif
                 }
-        }
+            }
+        #if os(iOS)
+            .statusBarHidden(chromeHidden)
+            .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
+            .onChange(of: chromeHidden) { _ in
+                // Wait for the rotation animation to settle — restarting VLC
+                // against mid-rotation bounds sizes the video for the old
+                // orientation (small video in a black frame).
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    viewModel.videoSurfaceGeometryChanged()
+                }
+            }
+        #endif
     }
 
     private var core: some View {
         ZStack {
-            PlayerSurface(player: viewModel.player)
+            videoSurface
 
             switch viewModel.state {
             case .idle:
@@ -65,6 +94,19 @@ struct PlayerView: View {
                 errorOverlay(message)
             }
         }
+    }
+
+    @ViewBuilder
+    private var videoSurface: some View {
+        #if canImport(VLCKitSPM) && !os(macOS)
+        if viewModel.engine == .vlc {
+            VLCPlayerSurface(viewModel: viewModel)
+        } else {
+            PlayerSurface(player: viewModel.player)
+        }
+        #else
+        PlayerSurface(player: viewModel.player)
+        #endif
     }
 
     private func toggleFullScreen() {

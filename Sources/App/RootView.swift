@@ -14,13 +14,10 @@ struct RootView: View {
             ChannelBrowserView(account: account)
                 .id(account.host)
         } else {
-            NavigationSplitView {
-                Text("No account")
-                    .foregroundStyle(.secondary)
-            } detail: {
-                noAccountView
-            }
-            .navigationTitle("IronTV")
+            // Full-window empty state — no split view, so it works on
+            // compact (iPhone) layouts too.
+            noAccountView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

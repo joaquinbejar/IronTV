@@ -2,6 +2,9 @@ import AVKit
 import Combine
 import Foundation
 import QuartzCore
+#if canImport(VLCKitSPM)
+import VLCKitSPM
+#endif
 
 @MainActor
 final class PlayerViewModel: ObservableObject {
@@ -13,6 +16,28 @@ final class PlayerViewModel: ObservableObject {
         case reconnecting
         case failed(String)
     }
+
+    /// AVPlayer is the primary engine (hardware decode, AirPlay). VLC is the
+    /// fallback for codecs AVPlayer rejects on this platform (MP2 audio,
+    /// interlaced video — common on IPTV panels).
+    enum Engine: Equatable {
+        case avPlayer
+        case vlc
+    }
+
+    @Published private(set) var engine: Engine = .avPlayer
+    /// Streams whose codecs AVPlayer already rejected this session — zap
+    /// straight to VLC next time.
+    private var vlcOnlyStreams: Set<StreamID> = []
+
+    #if canImport(VLCKitSPM)
+    private(set) var vlcPlayer: VLCMediaPlayer?
+    private lazy var vlcProxy: VLCDelegateProxy = {
+        let proxy = VLCDelegateProxy()
+        proxy.owner = self
+        return proxy
+    }()
+    #endif
 
 
     /// User-tunable buffering/reconnect knobs, re-read at every playback start
@@ -95,6 +120,12 @@ final class PlayerViewModel: ObservableObject {
     /// look like AppleCoreMedia, which is exactly AVPlayer's default.
     func play(_ stream: LiveStream, url: URL) {
         reconnectAttempts = 0
+        #if canImport(VLCKitSPM)
+        if vlcOnlyStreams.contains(stream.id) {
+            startVLCPlayback(stream, url: url, as: .loading)
+            return
+        }
+        #endif
         startPlayback(stream, url: url, as: .loading)
     }
 
@@ -107,6 +138,14 @@ final class PlayerViewModel: ObservableObject {
     /// fix for A/V drift accumulated from sloppy panel transcodes.
     func resyncToLive() {
         guard currentStream != nil else { return }
+        #if canImport(VLCKitSPM)
+        if engine == .vlc {
+            if let currentStream, let currentURL {
+                startVLCPlayback(currentStream, url: currentURL, as: .buffering)
+            }
+            return
+        }
+        #endif
         seekTowardLiveEdge()
     }
 
@@ -118,6 +157,8 @@ final class PlayerViewModel: ObservableObject {
     func stop() {
         watchdog?.invalidate()
         watchdog = nil
+        stopVLC()
+        engine = .avPlayer
         replacePlayer() // disposes the old (possibly wedged) player off-main
         currentStream = nil
         currentURL = nil
@@ -128,6 +169,8 @@ final class PlayerViewModel: ObservableObject {
 
     private func startPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
         settings = settingsStore.load()
+        stopVLC()
+        engine = .avPlayer
         replacePlayer()
         currentStream = stream
         currentURL = url
@@ -161,14 +204,14 @@ final class PlayerViewModel: ObservableObject {
     private func observe(_ item: AVPlayerItem) {
         statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
             let status = item.status
-            let message = item.error?.localizedDescription
+            let message = Self.friendlyPlaybackMessage(for: item.error)
             Task { @MainActor [weak self] in
                 guard let self, self.player.currentItem === item else { return }
                 switch status {
                 case .readyToPlay:
                     self.state = .playing
                 case .failed:
-                    self.reconnectOrFail(message ?? "This channel could not be played.")
+                    self.handleItemFailure(item.error, fallbackMessage: message)
                 default:
                     break
                 }
@@ -234,6 +277,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func watchdogTick() {
+        guard engine == .avPlayer else { return } // VLC self-recovers via delegate
         guard currentStream != nil, state != .idle else { return }
         if case .failed = state { return }
 
@@ -341,7 +385,52 @@ final class PlayerViewModel: ObservableObject {
             state = .failed("Lost connection to the stream. Press Retry to reconnect.")
             return
         }
+        #if canImport(VLCKitSPM)
+        if engine == .vlc {
+            startVLCPlayback(currentStream, url: currentURL, as: .reconnecting)
+            return
+        }
+        #endif
         startPlayback(currentStream, url: currentURL, as: .reconnecting)
+    }
+
+    /// AVPlayer item failed: codec problems fall back to the VLC engine
+    /// (which decodes MP2/interlaced via FFmpeg); anything else goes through
+    /// the normal reconnect budget.
+    private func handleItemFailure(_ error: Error?, fallbackMessage: String) {
+        if Self.isCodecError(error), let currentStream {
+            vlcOnlyStreams.insert(currentStream.id)
+            #if canImport(VLCKitSPM)
+            if let currentURL {
+                reconnectAttempts = 0
+                startVLCPlayback(currentStream, url: currentURL, as: .loading)
+                return
+            }
+            #endif
+        }
+        reconnectOrFail(fallbackMessage)
+    }
+
+    /// 'fmt?' and friends — the stream's codec can't be decoded here.
+    private static func isCodecError(_ error: Error?) -> Bool {
+        guard let error else { return false }
+        let nsError = error as NSError
+        if nsError.domain == "CoreMediaErrorDomain" {
+            return nsError.code == 1718449215 || nsError.code == -12718
+        }
+        return false
+    }
+
+    /// Translates opaque CoreMedia errors into something actionable.
+    private static func friendlyPlaybackMessage(for error: Error?) -> String {
+        guard let error else { return "This channel could not be played." }
+        let nsError = error as NSError
+        // 'fmt?' — the stream uses a codec this device can't decode
+        // (typically MP2 audio or interlaced video from IPTV panels).
+        if nsError.domain == "CoreMediaErrorDomain" && nsError.code == 1718449215 {
+            return "This channel uses a video/audio format not supported on this device."
+        }
+        return nsError.localizedDescription
     }
 
     private func reconnectOrFail(_ message: String) {
@@ -356,4 +445,102 @@ final class PlayerViewModel: ObservableObject {
         watchdog?.invalidate()
         notificationObservers.forEach(NotificationCenter.default.removeObserver(_:))
     }
+
+    // MARK: - VLC fallback engine
+
+    private func stopVLC() {
+        #if canImport(VLCKitSPM)
+        vlcPlayer?.stop()
+        vlcPlayer?.delegate = nil
+        vlcPlayer = nil
+        #endif
+    }
+
+    #if canImport(VLCKitSPM)
+    private func startVLCPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
+        settings = settingsStore.load()
+        watchdog?.invalidate()
+        watchdog = nil
+        stopVLC()
+        replacePlayer() // park the AVPlayer
+
+        engine = .vlc
+        currentStream = stream
+        currentURL = url
+        state = initialState
+
+        let media = VLCMedia(url: url)
+        // The panel 403s non-Apple user agents (VLC's default is rejected).
+        media.addOption(":http-user-agent=AppleCoreMedia/1.0.0")
+        media.addOption(":http-reconnect=true")
+        media.addOption(":network-caching=\(Int(settings.liveEdgeOffsetSeconds * 1000))")
+
+        let player = VLCMediaPlayer()
+        player.media = media
+        player.delegate = vlcProxy
+        vlcPlayer = player
+        player.play()
+    }
+
+    fileprivate func vlcStateChanged(_ vlcState: VLCMediaPlayerState) {
+        guard engine == .vlc else { return }
+        switch vlcState {
+        case .opening, .buffering:
+            // VLC emits .buffering constantly during healthy playback —
+            // never downgrade from .playing on it. Real progress is signalled
+            // by vlcTimeAdvanced().
+            break
+        case .playing, .esAdded:
+            state = .playing
+        case .paused:
+            break // user pause via future controls; don't fight it
+        case .error:
+            reconnectOrFail("This channel could not be played (VLC engine).")
+        case .stopped, .ended:
+            // Live streams shouldn't end — treat as a dropped connection.
+            if state == .playing || state == .buffering {
+                reconnect()
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    /// Orientation changed: VLC's GL output sizes its buffers off the main
+    /// thread and often keeps the old geometry (small video in a black
+    /// frame). Restarting the playback creates a correctly-sized vout.
+    func videoSurfaceGeometryChanged() {
+        guard engine == .vlc, let currentStream, let currentURL else { return }
+        startVLCPlayback(currentStream, url: currentURL, as: .buffering)
+    }
+
+    /// VLC's playback clock advanced — frames are flowing.
+    fileprivate func vlcTimeAdvanced() {
+        guard engine == .vlc, state != .playing else { return }
+        if case .failed = state { return }
+        state = .playing
+        reconnectAttempts = 0
+    }
+    #endif
 }
+
+#if canImport(VLCKitSPM)
+/// Bridges VLC's ObjC delegate onto the MainActor view model.
+private final class VLCDelegateProxy: NSObject, VLCMediaPlayerDelegate {
+    weak var owner: PlayerViewModel?
+
+    func mediaPlayerStateChanged(_ aNotification: Notification) {
+        guard let player = aNotification.object as? VLCMediaPlayer else { return }
+        let state = player.state
+        Task { @MainActor [weak owner] in
+            owner?.vlcStateChanged(state)
+        }
+    }
+
+    func mediaPlayerTimeChanged(_ aNotification: Notification) {
+        Task { @MainActor [weak owner] in
+            owner?.vlcTimeAdvanced()
+        }
+    }
+}
+#endif

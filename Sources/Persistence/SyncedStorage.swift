@@ -22,12 +22,22 @@ public final class SyncedStorage: KeyValueStorage {
     public static let shared = SyncedStorage()
 
     private let defaults: UserDefaults
-    private let cloud: NSUbiquitousKeyValueStore
+    /// nil until the iCloud KVS entitlement is provisioned — touching
+    /// NSUbiquitousKeyValueStore without it logs "BUG IN CLIENT OF KVS"
+    /// on every launch. Gated by the `IronTVCloudKVSEnabled` Info.plist flag.
+    private let cloud: NSUbiquitousKeyValueStore?
     private var observer: NSObjectProtocol?
 
-    public init(defaults: UserDefaults = .standard, cloud: NSUbiquitousKeyValueStore = .default) {
+    public convenience init(defaults: UserDefaults = .standard) {
+        let enabled = Bundle.main.object(forInfoDictionaryKey: "IronTVCloudKVSEnabled") as? Bool ?? false
+        self.init(defaults: defaults, cloud: enabled ? .default : nil)
+    }
+
+    public init(defaults: UserDefaults, cloud: NSUbiquitousKeyValueStore?) {
         self.defaults = defaults
         self.cloud = cloud
+
+        guard let cloud else { return }
 
         observer = NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
@@ -54,17 +64,18 @@ public final class SyncedStorage: KeyValueStorage {
 
     public func set(_ value: Any?, forKey defaultName: String) {
         defaults.set(value, forKey: defaultName)
-        cloud.set(value, forKey: defaultName)
-        cloud.synchronize()
+        cloud?.set(value, forKey: defaultName)
+        cloud?.synchronize()
     }
 
     public func removeObject(forKey defaultName: String) {
         defaults.removeObject(forKey: defaultName)
-        cloud.removeObject(forKey: defaultName)
-        cloud.synchronize()
+        cloud?.removeObject(forKey: defaultName)
+        cloud?.synchronize()
     }
 
     private func applyExternalChanges(_ notification: Notification) {
+        guard let cloud else { return }
         let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
         for key in changedKeys {
             if let value = cloud.object(forKey: key) {

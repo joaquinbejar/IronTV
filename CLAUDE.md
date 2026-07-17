@@ -31,7 +31,7 @@ After adding/removing/renaming source files, run `xcodegen generate` before buil
 - Domain modeling first: domain types (`Account`, `Category`, `LiveStream`) are separate from API DTOs. DTOs live in `Sources/API/DTO/`, domain types in `Sources/Domain/`.
 - Xtream panels are PHP-backed and inconsistent: numeric fields may arrive as `Int` or `String` depending on the panel. All DTOs must decode both (use a `FlexibleInt`/`FlexibleString` property wrapper or custom `init(from:)`).
 - Errors: typed errors per layer (`XtreamAPIError`, `PlaybackError`), no `fatalError` in production paths.
-- No third-party dependencies unless strictly necessary. Prefer Foundation/AVKit.
+- No third-party dependencies unless strictly necessary. Prefer Foundation/AVKit. (Current exception, user-approved: VLCKit on iOS/tvOS as codec-fallback engine — LGPL, keep it dynamically linked.)
 
 ## Constraints & gotchas
 

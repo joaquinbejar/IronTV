@@ -4,8 +4,14 @@ options:
   deploymentTarget:
     macOS: "13.0"
     iOS: "16.0"
-    tvOS: "16.0"
+    tvOS: "17.0"
   createIntermediateGroups: true
+packages:
+  # VLC fallback decoder for channels AVPlayer can't play on iOS/tvOS
+  # (MP2 audio, interlaced video). Binary SPM wrapper of official VLCKit.
+  VLCKitSPM:
+    url: https://github.com/tylerjonesio/vlckit-spm
+    from: "3.6.0"
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -30,8 +36,10 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        CFBundleShortVersionString: "0.1.7"
-        CFBundleVersion: "8"
+        # Flip to true once the iCloud KVS entitlement is provisioned.
+        IronTVCloudKVSEnabled: false
+        CFBundleShortVersionString: "0.1.9"
+        CFBundleVersion: "10"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         LSApplicationCategoryType: public.app-category.video
         NSAppTransportSecurity:
@@ -76,8 +84,10 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        CFBundleShortVersionString: "0.1.7"
-        CFBundleVersion: "8"
+        # Flip to true once the iCloud KVS entitlement is provisioned.
+        IronTVCloudKVSEnabled: false
+        CFBundleShortVersionString: "0.1.9"
+        CFBundleVersion: "10"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -91,12 +101,16 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+    dependencies:
+      - package: VLCKitSPM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.quantkernel.irontv
         PRODUCT_NAME: IronTV
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Xcode manages iOS provisioning profiles (device installs) itself.
+        CODE_SIGN_STYLE: Automatic
   IronTV-tvOS:
     type: application
     platform: tvOS
@@ -112,16 +126,22 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        CFBundleShortVersionString: "0.1.7"
-        CFBundleVersion: "8"
+        # Flip to true once the iCloud KVS entitlement is provisioned.
+        IronTVCloudKVSEnabled: false
+        CFBundleShortVersionString: "0.1.9"
+        CFBundleVersion: "10"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+    dependencies:
+      - package: VLCKitSPM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.quantkernel.irontv
         PRODUCT_NAME: IronTV
         TARGETED_DEVICE_FAMILY: "3"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
   IronTVTests:
     type: bundle.unit-test
     platform: macOS

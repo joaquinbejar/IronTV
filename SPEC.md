@@ -77,9 +77,11 @@ MVVM-lite: one observable view model per feature, `XtreamClient` injected. No ex
 5. **Playback**: select channel -> AVPlayer plays `.m3u8` URL; loading/error states; remember last channel.
 6. **Polish (post-MVP, optional)**: short EPG display, VOD (`get_vod_streams`), multi-account. (Favorites shipped early, in milestone 4.)
 
-## Out of scope (MVP)
+## Playback engines
 
-- MPEG-TS playback (would require libmpv/VLCKit)
+AVPlayer is the primary engine everywhere (hardware decode, AirPlay). On iOS/tvOS, channels whose codecs AVPlayer rejects (MP2 audio, interlaced video — CoreMedia error 'fmt?') automatically fall back to **VLCKit** (LGPL, via the `VLCKitSPM` binary package). VLC's default User-Agent is 403'd by panels, so the fallback forces an AppleCoreMedia UA. Streams that needed VLC are remembered per session and skip the AVPlayer attempt on the next zap.
+
+## Out of scope (MVP)
 - Full XMLTV EPG grid
 - Recording, timeshift
 - iOS/tvOS targets
