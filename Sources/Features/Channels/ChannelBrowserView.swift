@@ -16,6 +16,9 @@ struct ChannelBrowserView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     #endif
+    #if os(tvOS)
+    @State private var tvPath = NavigationPath()
+    #endif
 
     init(account: Account) {
         _channels = StateObject(wrappedValue: ChannelsViewModel(account: account))
@@ -66,8 +69,16 @@ struct ChannelBrowserView: View {
     }
 
     #if os(tvOS)
+    private func tvTitle(_ selection: CategorySelection) -> String {
+        switch selection {
+        case .all: return "All Channels"
+        case .favorites: return "Favorites"
+        case .category(let id): return channels.categories.first { $0.id == id }?.name ?? "Channels"
+        }
+    }
+
     private var tvContent: some View {
-        NavigationStack {
+        NavigationStack(path: $tvPath) {
             Group {
                 switch channels.categoriesPhase {
                 case .loading:
@@ -78,27 +89,27 @@ struct ChannelBrowserView: View {
                     }
                 case .loaded:
                     List {
-                        NavigationLink {
-                            TVChannelListScreen(channels: channels, player: player, selection: .all, title: "All Channels")
-                        } label: {
+                        NavigationLink(value: CategorySelection.all) {
                             Label("All Channels", systemImage: "square.grid.2x2")
                         }
-                        NavigationLink {
-                            TVChannelListScreen(channels: channels, player: player, selection: .favorites, title: "Favorites")
-                        } label: {
+                        NavigationLink(value: CategorySelection.favorites) {
                             Label("Favorites", systemImage: "star")
                         }
                         Section("Categories") {
                             ForEach(channels.categories) { category in
-                                NavigationLink(category.name) {
-                                    TVChannelListScreen(channels: channels, player: player, selection: .category(category.id), title: category.name)
-                                }
+                                NavigationLink(category.name, value: CategorySelection.category(category.id))
                             }
                         }
                     }
                 }
             }
             .navigationTitle("IronTV")
+            .navigationDestination(for: CategorySelection.self) { selection in
+                TVChannelListScreen(channels: channels, player: player, selection: selection, title: tvTitle(selection))
+            }
+            .navigationDestination(for: LiveStream.self) { stream in
+                TVPlayerScreen(channels: channels, player: player, stream: stream)
+            }
             .toolbar {
                 ToolbarItem {
                     Button {
@@ -109,8 +120,28 @@ struct ChannelBrowserView: View {
                 }
             }
         }
+        .task { applyTVDemoScreenIfNeeded() }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+    }
+
+    /// tvOS screenshot deep-link (separate nav model from iOS/macOS).
+    private func applyTVDemoScreenIfNeeded() {
+        guard DemoMode.isActive,
+              let screen = ProcessInfo.processInfo.environment["IRONTV_DEMO_SCREEN"] else { return }
+        switch screen {
+        case "channels":
+            tvPath.append(CategorySelection.category(CategoryID(2)))
+        case "favorites":
+            tvPath.append(CategorySelection.favorites)
+        case "player":
+            tvPath.append(CategorySelection.category(CategoryID(2)))
+            if let stream = DemoMode.streams(in: .category(CategoryID(2))).first(where: { $0.name == "Match Day FHD" }) {
+                tvPath.append(stream)
+            }
+        default:
+            break
         }
     }
     #endif
@@ -370,9 +401,7 @@ private struct TVChannelListScreen: View {
                     }
                 } else {
                     List(channels.filteredStreams) { stream in
-                        NavigationLink {
-                            TVPlayerScreen(channels: channels, player: player, stream: stream)
-                        } label: {
+                        NavigationLink(value: stream) {
                             ChannelRow(
                                 stream: stream,
                                 isFavorite: channels.isFavorite(stream.id),
