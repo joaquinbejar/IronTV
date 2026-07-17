@@ -74,6 +74,11 @@ struct PlayerView: View {
         #endif
     }
 
+    /// Brief rebuffers are invisible: the buffering/reconnecting overlay only
+    /// appears when the interruption lasts longer than this.
+    private static let overlayDelay: UInt64 = 1_500_000_000
+    @State private var showTransientOverlay = false
+
     private var core: some View {
         ZStack {
             videoSurface
@@ -86,24 +91,41 @@ struct PlayerView: View {
                     .padding(16)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
             case .buffering:
-                ProgressView("Buffering…")
-                    .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                if showTransientOverlay {
+                    ProgressView("Buffering…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                }
             case .reconnecting:
-                ProgressView("Reconnecting…")
-                    .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                if showTransientOverlay {
+                    ProgressView("Reconnecting…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                }
             case .playing:
                 EmptyView()
             case .failed(let message):
                 errorOverlay(message)
             }
         }
+        .onChange(of: viewModel.state) { state in
+            switch state {
+            case .buffering, .reconnecting:
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: Self.overlayDelay)
+                    if viewModel.state == .buffering || viewModel.state == .reconnecting {
+                        showTransientOverlay = true
+                    }
+                }
+            default:
+                showTransientOverlay = false
+            }
+        }
     }
 
     @ViewBuilder
     private var videoSurface: some View {
-        #if canImport(VLCKitSPM) && !os(macOS)
+        #if canImport(VLCKitSPM)
         if viewModel.engine == .vlc {
             VLCPlayerSurface(viewModel: viewModel)
         } else {

@@ -31,7 +31,8 @@ final class PlaybackSettingsStoreTests: XCTestCase {
             maxReconnectAttempts: 8,
             watchdogIntervalSeconds: 5,
             fastStart: false,
-            apiTimeoutSeconds: 45
+            apiTimeoutSeconds: 45,
+            preferredEngine: .vlc
         )
         store.save(custom)
         XCTAssertEqual(store.load(), custom)

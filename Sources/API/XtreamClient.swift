@@ -37,13 +37,22 @@ public struct XtreamClient: Sendable {
 
     // MARK: - URL building
 
-    /// HLS playback URL: `{host}/live/{username}/{password}/{stream_id}.m3u8`.
+    /// Container the panel serves a live stream in.
+    public enum StreamFormat: String, Sendable {
+        /// Apple HLS playlist — required by AVPlayer.
+        case hls = "m3u8"
+        /// Raw MPEG-TS over HTTP — a single continuous connection, immune to
+        /// the janky HLS playlists panels produce. Played by the VLC engine.
+        case ts = "ts"
+    }
+
+    /// Playback URL: `{host}/live/{username}/{password}/{stream_id}.{ext}`.
     /// Never log the result unredacted — see `CredentialRedactor`.
-    public func playbackURL(for streamID: StreamID) throws -> URL {
+    public func playbackURL(for streamID: StreamID, format: StreamFormat = .hls) throws -> URL {
         guard var components = URLComponents(url: account.host, resolvingAgainstBaseURL: false) else {
             throw XtreamAPIError.invalidURL
         }
-        components.path = "/live/\(account.username)/\(account.password)/\(streamID.rawValue).m3u8"
+        components.path = "/live/\(account.username)/\(account.password)/\(streamID.rawValue).\(format.rawValue)"
         guard let url = components.url else {
             throw XtreamAPIError.invalidURL
         }

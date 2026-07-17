@@ -34,7 +34,11 @@ struct ChannelBrowserView: View {
                 #if !os(tvOS)
                 guard let streamID, let stream = channels.selectedStream() else { return }
                 do {
-                    player.play(stream, url: try channels.playbackURL(for: streamID))
+                    player.play(
+                        stream,
+                        url: try channels.playbackURL(for: streamID),
+                        tsURL: channels.playbackTSURL(for: streamID)
+                    )
                 } catch {
                     player.fail(error)
                 }
@@ -437,7 +441,11 @@ private struct TVPlayerScreen: View {
             .onAppear {
                 channels.selectedStreamID = stream.id // remembers last channel
                 do {
-                    player.play(stream, url: try channels.playbackURL(for: stream.id))
+                    player.play(
+                        stream,
+                        url: try channels.playbackURL(for: stream.id),
+                        tsURL: channels.playbackTSURL(for: stream.id)
+                    )
                 } catch {
                     player.fail(error)
                 }
