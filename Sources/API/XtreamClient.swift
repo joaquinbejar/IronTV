@@ -7,7 +7,7 @@ public struct XtreamClient: Sendable {
     private let session: URLSession
     private let requestTimeout: TimeInterval
 
-    private static let logger = Logger(subsystem: "com.quantkernel.irontv", category: "xtream")
+    private static let logger = Logger(subsystem: "com.taunais.irontv", category: "xtream")
 
     public init(account: Account, session: URLSession = .shared, requestTimeout: TimeInterval = 30) {
         self.account = account

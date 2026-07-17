@@ -20,7 +20,7 @@ public struct KeychainStore {
     private let service: String
     private let accountName = "xtream-account"
 
-    public init(service: String = "com.quantkernel.irontv") {
+    public init(service: String = "com.taunais.irontv") {
         self.service = service
     }
 
