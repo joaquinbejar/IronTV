@@ -38,8 +38,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "0.1.11"
-        CFBundleVersion: "12"
+        CFBundleShortVersionString: "0.1.12"
+        CFBundleVersion: "13"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         LSApplicationCategoryType: public.app-category.video
         NSAppTransportSecurity:
@@ -85,8 +85,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "0.1.11"
-        CFBundleVersion: "12"
+        CFBundleShortVersionString: "0.1.12"
+        CFBundleVersion: "13"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -132,8 +132,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "0.1.11"
-        CFBundleVersion: "12"
+        CFBundleShortVersionString: "0.1.12"
+        CFBundleVersion: "13"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

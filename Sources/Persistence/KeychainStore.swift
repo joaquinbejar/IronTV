@@ -35,7 +35,14 @@ public struct KeychainStore {
         // doesn't receive iCloud Keychain — the URL is re-entered there).
         attributes[kSecAttrSynchronizable as String] = true
 
-        let status = SecItemAdd(attributes as CFDictionary, nil)
+        var status = SecItemAdd(attributes as CFDictionary, nil)
+        if status == errSecMissingEntitlement {
+            // Synchronizable items need an application-identifier entitlement
+            // (provisioning profile). macOS Developer ID builds don't have
+            // one yet — store the account locally instead of failing.
+            attributes[kSecAttrSynchronizable as String] = false
+            status = SecItemAdd(attributes as CFDictionary, nil)
+        }
         guard status == errSecSuccess else {
             throw KeychainError.unexpectedStatus(status)
         }
