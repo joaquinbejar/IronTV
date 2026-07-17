@@ -15,8 +15,9 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    CODE_SIGN_STYLE: Manual
-    CODE_SIGN_IDENTITY: "Apple Development"
+    # App Store distribution on all platforms. Automatic signing lets Xcode
+    # pick Apple Development for Debug and Apple Distribution for archives.
+    CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: 5NP3LPSUMR
 targets:
   IronTV:
@@ -38,7 +39,7 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.0.0"
+        CFBundleShortVersionString: "1.0"
         CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
@@ -50,27 +51,14 @@ targets:
     entitlements:
       path: Sources/IronTV.entitlements
       properties:
-        # No App Sandbox for Developer ID / DMG distribution: a sandboxed app
-        # copied by another sandboxed process gets tagged "File created by an
-        # AppSandbox, exec/open not allowed" and won't launch. Hardened Runtime
-        # + notarization is what Developer ID needs. (Re-add the sandbox in a
-        # separate entitlements file when building for the Mac App Store.)
+        # App Sandbox is mandatory for the Mac App Store. network.client
+        # allows outgoing connections to the IPTV server and sample streams.
+        com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
-        ENABLE_HARDENED_RUNTIME: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      configs:
-        Release:
-          # Distribution builds: Developer ID + secure timestamp (required
-          # for notarization). Debug keeps the Apple Development identity.
-          # macOS-only settings — Developer ID does not exist on iOS/tvOS.
-          CODE_SIGN_IDENTITY: "Developer ID Application"
-          OTHER_CODE_SIGN_FLAGS: "--timestamp"
-          # Don't inject the get-task-allow debug entitlement — notarization
-          # rejects executables that request it.
-          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: false
     scheme:
       testTargets:
         - IronTVTests
@@ -90,7 +78,7 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "1.0.0"
+        CFBundleShortVersionString: "1.0"
         CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
@@ -138,7 +126,7 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "1.0.0"
+        CFBundleShortVersionString: "1.0"
         CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
