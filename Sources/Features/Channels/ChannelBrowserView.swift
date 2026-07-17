@@ -14,6 +14,7 @@ struct ChannelBrowserView: View {
     #endif
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     #endif
 
     init(account: Account) {
@@ -22,6 +23,9 @@ struct ChannelBrowserView: View {
 
     var body: some View {
         content
+            #if !os(tvOS)
+            .task { applyDemoScreenIfNeeded() }
+            #endif
             .onChange(of: channels.selectedStreamID) { streamID in
                 // tvOS navigates by pushing screens; playback starts there.
                 #if !os(tvOS)
@@ -117,6 +121,35 @@ struct ChannelBrowserView: View {
             PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen, hidesChrome: true)
                 .windowToolbarHidden(true)
         } else {
+            #if os(iOS)
+            NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $preferredCompactColumn) {
+                categoryColumn
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 250)
+                    .toolbar {
+                        ToolbarItem {
+                            Button {
+                                showingSettings = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            } content: {
+                channelColumn
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 280)
+            } detail: {
+                PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
+                    .onDisappear {
+                        if horizontalSizeClass == .compact {
+                            player.stop()
+                            channels.selectedStreamID = nil
+                        }
+                    }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
+            #else
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 categoryColumn
                     .navigationSplitViewColumnWidth(min: 200, ideal: 250)
@@ -136,25 +169,47 @@ struct ChannelBrowserView: View {
                     .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             } detail: {
                 PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
-                #if os(iOS)
-                    .onDisappear {
-                        // iPhone (compact width): popping back to the channel
-                        // list unmounts the player — stop the audio and clear
-                        // the selection so re-tapping the same channel works.
-                        if horizontalSizeClass == .compact {
-                            player.stop()
-                            channels.selectedStreamID = nil
-                        }
-                    }
-                #endif
-            }
-            #if !os(macOS)
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
             }
             #endif
         }
     }
+
+    #if !os(tvOS)
+    /// Screenshot deep-link: IRONTV_DEMO_SCREEN drives the app straight to one
+    /// screen so App Store captures are deterministic. No-op in normal use.
+    private func applyDemoScreenIfNeeded() {
+        guard DemoMode.isActive,
+              let screen = ProcessInfo.processInfo.environment["IRONTV_DEMO_SCREEN"] else { return }
+        switch screen {
+        case "channels":
+            channels.selectedCategory = .category(CategoryID(2)) // Sports
+            #if os(iOS)
+            preferredCompactColumn = .content
+            #endif
+        case "favorites":
+            channels.selectedCategory = .favorites
+            #if os(iOS)
+            preferredCompactColumn = .content
+            #endif
+        case "player":
+            channels.selectedCategory = .category(CategoryID(2))
+            #if os(iOS)
+            preferredCompactColumn = .detail
+            #endif
+            // Play the bundled demo clip directly — avoids the async
+            // stream-load race that would leave the player idle.
+            if let stream = DemoMode.streams(in: .category(CategoryID(2))).first(where: { $0.name == "Match Day FHD" }) {
+                player.play(stream, url: DemoMode.sampleStreamURL)
+            }
+        #if !os(macOS)
+        case "settings":
+            showingSettings = true
+        #endif
+        default:
+            break
+        }
+    }
+    #endif
 
     private func playerWillToggleFullScreen() {
         if !isFullScreen {

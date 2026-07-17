@@ -11,7 +11,11 @@ final class AppModel: ObservableObject {
 
     init(store: KeychainStore = KeychainStore()) {
         self.store = store
-        self.account = (try? store.loadAccount()) ?? nil
+        if DemoMode.isActive {
+            self.account = DemoMode.account
+        } else {
+            self.account = (try? store.loadAccount()) ?? nil
+        }
     }
 
     func saveAccount(_ account: Account) throws {

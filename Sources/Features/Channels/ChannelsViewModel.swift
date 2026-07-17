@@ -42,12 +42,14 @@ final class ChannelsViewModel: ObservableObject {
     /// Stream to re-select once its category's streams arrive (launch restore).
     private var pendingStreamRestore: StreamID?
 
+    private let isDemo = DemoMode.isActive
+
     init(account: Account, lastChannel: LastChannelStore = LastChannelStore()) {
         let settings = PlaybackSettingsStore().load()
         self.client = XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
         self.lastChannel = lastChannel
         self.favoritesStore = FavoritesStore(account: account)
-        self.favorites = favoritesStore.load()
+        self.favorites = DemoMode.isActive ? DemoMode.favoriteIDs : favoritesStore.load()
         Task { await loadCategories() }
     }
 
@@ -80,10 +82,16 @@ final class ChannelsViewModel: ObservableObject {
     }
 
     func playbackURL(for streamID: StreamID) throws -> URL {
-        try client.playbackURL(for: streamID)
+        if isDemo { return DemoMode.sampleStreamURL }
+        return try client.playbackURL(for: streamID)
     }
 
     func loadCategories() async {
+        if isDemo {
+            categories = DemoMode.categories
+            categoriesPhase = .loaded
+            return
+        }
         categoriesPhase = .loading
         do {
             categories = try await client.liveCategories()
@@ -98,6 +106,12 @@ final class ChannelsViewModel: ObservableObject {
         guard let selection = selectedCategory else {
             streams = []
             streamsPhase = .loaded
+            return
+        }
+        if isDemo {
+            streams = DemoMode.streams(in: selection)
+            streamsPhase = .loaded
+            applyPendingStreamRestore()
             return
         }
         if !bypassCache, selection != .favorites, let cached = streamCache[selection] {

@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.taunais
   deploymentTarget:
     macOS: "13.0"
-    iOS: "16.0"
+    iOS: "17.0"
     tvOS: "17.0"
   createIntermediateGroups: true
 packages:
