@@ -77,7 +77,9 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        IronTVCloudKVSEnabled: true
+        # iCloud settings-sync deferred to a 1.1 update (needs the App ID's
+        # iCloud container fully provisioned); off for the 1.0 submission.
+        IronTVCloudKVSEnabled: false
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
@@ -96,12 +98,6 @@ targets:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
-    entitlements:
-      path: Sources/IronTV-iOS.entitlements
-      properties:
-        # iCloud key-value store: syncs playback settings/favorites/last
-        # channel. Xcode automatic signing registers the capability.
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
@@ -125,7 +121,7 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        IronTVCloudKVSEnabled: true
+        IronTVCloudKVSEnabled: false
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "16"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
@@ -134,10 +130,6 @@ targets:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
-    entitlements:
-      path: Sources/IronTV-tvOS.entitlements
-      properties:
-        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
