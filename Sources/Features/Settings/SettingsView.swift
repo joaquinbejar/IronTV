@@ -200,7 +200,7 @@ struct PlaybackSettingsTab: View {
         .onAppear {
             settings = store.load()
         }
-        .onChange(of: settings) { newValue in
+        .onChange(of: settings) { _, newValue in
             store.save(newValue)
         }
     }

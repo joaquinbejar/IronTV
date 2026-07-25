@@ -487,7 +487,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     /// 'fmt?' and friends — the stream's codec can't be decoded here.
-    private static func isCodecError(_ error: Error?) -> Bool {
+    private nonisolated static func isCodecError(_ error: Error?) -> Bool {
         guard let error else { return false }
         let nsError = error as NSError
         if nsError.domain == "CoreMediaErrorDomain" {
@@ -497,7 +497,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     /// Translates opaque CoreMedia errors into something actionable.
-    private static func friendlyPlaybackMessage(for error: Error?) -> String {
+    private nonisolated static func friendlyPlaybackMessage(for error: Error?) -> String {
         guard let error else { return "This channel could not be played." }
         let nsError = error as NSError
         // 'fmt?' — the stream uses a codec this device can't decode

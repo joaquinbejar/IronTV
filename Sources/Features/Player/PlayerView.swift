@@ -74,7 +74,7 @@ struct PlayerView: View {
         #if os(iOS)
             .statusBarHidden(chromeHidden)
             .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
-            .onChange(of: chromeHidden) { _ in
+            .onChange(of: chromeHidden) {
                 // Wait for the rotation animation to settle — restarting VLC
                 // against mid-rotation bounds sizes the video for the old
                 // orientation (small video in a black frame).
@@ -120,7 +120,7 @@ struct PlayerView: View {
                 errorOverlay(message)
             }
         }
-        .onChange(of: viewModel.state) { state in
+        .onChange(of: viewModel.state) { _, state in
             switch state {
             case .buffering, .reconnecting:
                 Task { @MainActor in

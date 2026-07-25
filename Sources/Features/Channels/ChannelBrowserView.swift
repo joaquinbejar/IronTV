@@ -32,7 +32,7 @@ struct ChannelBrowserView: View {
             #if !os(tvOS)
             .task { applyDemoScreenIfNeeded() }
             #endif
-            .onChange(of: channels.selectedStreamID) { streamID in
+            .onChange(of: channels.selectedStreamID) { _, streamID in
                 // tvOS navigates by pushing screens; playback starts there.
                 #if !os(tvOS)
                 guard let streamID, let stream = channels.selectedStream() else { return }

@@ -2,7 +2,7 @@ name: IronTV
 options:
   bundleIdPrefix: com.taunais
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "14.0"
     iOS: "17.0"
     tvOS: "17.0"
   createIntermediateGroups: true
