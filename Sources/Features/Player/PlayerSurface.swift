@@ -31,3 +31,21 @@ struct PlayerSurface: View {
     }
 }
 #endif
+
+/// Engine-aware video surface (AVPlayer or VLC), shared by the main player
+/// view and the macOS floating mini-player.
+struct EngineVideoSurface: View {
+    @ObservedObject var viewModel: PlayerViewModel
+
+    var body: some View {
+        #if canImport(VLCKitSPM)
+        if viewModel.engine == .vlc {
+            VLCPlayerSurface(viewModel: viewModel)
+        } else {
+            PlayerSurface(player: viewModel.player)
+        }
+        #else
+        PlayerSurface(player: viewModel.player)
+        #endif
+    }
+}

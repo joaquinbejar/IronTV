@@ -152,13 +152,26 @@ struct PlaybackSettingsTab: View {
     var body: some View {
         Form {
             Section {
+                Picker("Playback engine", selection: $settings.preferredEngine) {
+                    Text("Automatic").tag(PlaybackEngineOption.auto)
+                    Text("Apple (HLS)").tag(PlaybackEngineOption.avplayer)
+                    Text("VLC (MPEG-TS)").tag(PlaybackEngineOption.vlc)
+                }
+            } header: {
+                Text("Engine")
+            } footer: {
+                Text("Automatic starts with the Apple player and silently switches a channel to the VLC engine (raw MPEG-TS, like most IPTV apps) when it keeps stalling or uses unsupported codecs.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 secondsStepper("Forward buffer", value: $settings.forwardBufferSeconds, in: 5...120, step: 5)
                 secondsStepper("Live delay (stall cushion)", value: $settings.liveEdgeOffsetSeconds, in: 0...60, step: 5)
                 Toggle("Fast start (may stutter on weak connections)", isOn: $settings.fastStart)
             } header: {
                 Text("Buffering")
             } footer: {
-                Text("A larger live delay starts playback further behind the live edge, absorbing network hiccups at the cost of being more seconds behind the broadcast.")
+                Text("A larger live delay starts playback further behind the live edge, absorbing network hiccups at the cost of being more seconds behind the broadcast. It is automatically capped to a third of the panel's live window.")
                     .foregroundStyle(.secondary)
             }
 

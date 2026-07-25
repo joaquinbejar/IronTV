@@ -83,6 +83,14 @@ final class PlayerViewModel: ObservableObject {
     private var frozenSeconds: TimeInterval = 0
     private var waitingSince: Date?
     private var reconnectAttempts = 0
+    private var lastReconnectAt: Date?
+    /// Raw MPEG-TS variant of the current stream, for the VLC engine.
+    private var currentTSURL: URL?
+    /// Timestamps of recent AVPlayer stall recoveries. A channel needing
+    /// several within a short window plays badly over the panel's HLS — the
+    /// cure is the raw TS stream through VLC, which is what other IPTV
+    /// players use and why they don't stall on the same URL.
+    private var stallRecoveryEvents: [Date] = []
     /// Detects frozen *video* — audio can keep playing (clock advances) while
     /// the video track is stuck, which the currentTime check can't see.
     private var videoOutput: AVPlayerItemVideoOutput?
@@ -118,11 +126,22 @@ final class PlayerViewModel: ObservableObject {
 
     /// Do not override the User-Agent here: panels 403 anything that doesn't
     /// look like AppleCoreMedia, which is exactly AVPlayer's default.
-    func play(_ stream: LiveStream, url: URL) {
+    /// `tsURL` is the raw MPEG-TS variant the VLC engine prefers (nil for
+    /// demo/sample content).
+    func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil) {
         reconnectAttempts = 0
+        lastReconnectAt = nil
+        stallRecoveryEvents = []
+        currentTSURL = tsURL
+        settings = settingsStore.load()
         #if canImport(VLCKitSPM)
-        if vlcOnlyStreams.contains(stream.id) {
-            startVLCPlayback(stream, url: url, as: .loading)
+        // Forced-VLC preference, or a channel this session already learned
+        // needs VLC — skip the AVPlayer attempt entirely.
+        let forceVLC = settings.preferredEngine == .vlc && !DemoMode.isActive
+        if forceVLC || vlcOnlyStreams.contains(stream.id) {
+            currentStream = stream
+            currentURL = url
+            startVLCPlayback(stream, url: tsURL ?? url, as: .loading)
             return
         }
         #endif
@@ -131,7 +150,12 @@ final class PlayerViewModel: ObservableObject {
 
     func retry() {
         guard let currentStream, let currentURL else { return }
-        play(currentStream, url: currentURL)
+        play(currentStream, url: currentURL, tsURL: currentTSURL)
+    }
+
+    /// URL the VLC engine should use: raw TS when the panel offers it.
+    private var currentVLCURL: URL? {
+        currentTSURL ?? currentURL
     }
 
     /// Realigns audio/video clocks by jumping to the live edge — the manual
@@ -140,8 +164,8 @@ final class PlayerViewModel: ObservableObject {
         guard currentStream != nil else { return }
         #if canImport(VLCKitSPM)
         if engine == .vlc {
-            if let currentStream, let currentURL {
-                startVLCPlayback(currentStream, url: currentURL, as: .buffering)
+            if let currentStream, let url = currentVLCURL {
+                startVLCPlayback(currentStream, url: url, as: .buffering)
             }
             return
         }
@@ -162,6 +186,8 @@ final class PlayerViewModel: ObservableObject {
         replacePlayer() // disposes the old (possibly wedged) player off-main
         currentStream = nil
         currentURL = nil
+        currentTSURL = nil
+        stallRecoveryEvents = []
         state = .idle
     }
 
@@ -210,6 +236,7 @@ final class PlayerViewModel: ObservableObject {
                 switch status {
                 case .readyToPlay:
                     self.state = .playing
+                    self.adaptLiveOffsetToWindow(of: item)
                 case .failed:
                     self.handleItemFailure(item.error, fallbackMessage: message)
                 default:
@@ -265,6 +292,22 @@ final class PlayerViewModel: ObservableObject {
         notificationObservers = []
     }
 
+    /// Xtream panels keep a tiny live window (often ~30s of segments). A
+    /// cushion deeper than a third of that window parks playback near the
+    /// window's trailing edge, where any hiccup falls out of the playlist and
+    /// stalls. Cap the configured offset once the window size is known —
+    /// stall-recovery seeks (automaticallyPreservesTimeOffsetFromLive) then
+    /// re-anchor to the capped offset.
+    private func adaptLiveOffsetToWindow(of item: AVPlayerItem) {
+        guard let range = item.seekableTimeRanges.last?.timeRangeValue else { return }
+        let window = CMTimeGetSeconds(range.duration)
+        guard window.isFinite, window > 0 else { return }
+        let cap = max(4, window / 3)
+        if settings.liveEdgeOffsetSeconds > cap {
+            item.configuredTimeOffsetFromLive = CMTime(seconds: cap, preferredTimescale: 1)
+        }
+    }
+
     // MARK: - Reconnect watchdog
 
     private func startWatchdog() {
@@ -302,6 +345,8 @@ final class PlayerViewModel: ObservableObject {
                 frozenSeconds += settings.watchdogIntervalSeconds
                 if frozenSeconds >= settings.frozenTimeoutSeconds {
                     frozenSeconds = 0
+                    noteStallRecovery()
+                    guard engine == .avPlayer else { break } // churn-switched to VLC
                     if !attemptedSeekRecovery {
                         // Cheap first: jump back to the live edge, which
                         // usually unsticks the video decoder without the
@@ -339,12 +384,32 @@ final class PlayerViewModel: ObservableObject {
         }
         guard Date().timeIntervalSince(waitingSince) >= settings.waitingTimeoutSeconds else { return }
         self.waitingSince = Date() // restart the clock for the next escalation
+        noteStallRecovery()
+        guard engine == .avPlayer else { return } // churn-switched to VLC
         if !attemptedSeekRecovery {
             attemptedSeekRecovery = true
             seekTowardLiveEdge()
         } else {
             reconnect()
         }
+    }
+
+    /// Counts AVPlayer stall recoveries. Three within two minutes means the
+    /// panel's HLS is too broken for AVPlayer — switch this channel to the
+    /// raw MPEG-TS stream through VLC (the strategy every other IPTV player
+    /// uses), silently and for the rest of the session.
+    private func noteStallRecovery() {
+        guard engine == .avPlayer, settings.preferredEngine == .auto else { return }
+        let now = Date()
+        stallRecoveryEvents = stallRecoveryEvents.filter { now.timeIntervalSince($0) < 120 }
+        stallRecoveryEvents.append(now)
+        guard stallRecoveryEvents.count >= 3 else { return }
+        #if canImport(VLCKitSPM)
+        guard let currentStream, let url = currentVLCURL else { return }
+        stallRecoveryEvents = []
+        vlcOnlyStreams.insert(currentStream.id)
+        startVLCPlayback(currentStream, url: url, as: .reconnecting)
+        #endif
     }
 
     /// True when a video frame newer than the last check is available.
@@ -375,19 +440,29 @@ final class PlayerViewModel: ObservableObject {
     }
 
     /// Tears the item down and reopens the stream URL — the panel issues a
-    /// fresh playback token on every connection.
+    /// fresh playback token on every connection. Live streams never give up:
+    /// after a burst of fast retries it backs off but keeps trying silently,
+    /// so a temporarily-dropped channel resumes on its own with no prompt.
     private func reconnect() {
         guard let currentStream, let currentURL else { return }
         reconnectAttempts += 1
-        guard reconnectAttempts <= settings.maxReconnectAttempts else {
-            watchdog?.invalidate()
-            watchdog = nil
-            state = .failed("Lost connection to the stream. Press Retry to reconnect.")
+
+        // Immediate for the first few attempts, then a capped backoff. The
+        // watchdog keeps calling us; we no-op (staying in .reconnecting) until
+        // enough time has passed for the next attempt.
+        let backoff: TimeInterval = reconnectAttempts <= settings.maxReconnectAttempts
+            ? 0
+            : min(Double(reconnectAttempts - settings.maxReconnectAttempts) * 3, 15)
+        let now = Date()
+        if backoff > 0, let last = lastReconnectAt, now.timeIntervalSince(last) < backoff {
+            state = .reconnecting
             return
         }
+        lastReconnectAt = now
+
         #if canImport(VLCKitSPM)
         if engine == .vlc {
-            startVLCPlayback(currentStream, url: currentURL, as: .reconnecting)
+            startVLCPlayback(currentStream, url: currentTSURL ?? currentURL, as: .reconnecting)
             return
         }
         #endif
@@ -403,7 +478,7 @@ final class PlayerViewModel: ObservableObject {
             #if canImport(VLCKitSPM)
             if let currentURL {
                 reconnectAttempts = 0
-                startVLCPlayback(currentStream, url: currentURL, as: .loading)
+                startVLCPlayback(currentStream, url: currentTSURL ?? currentURL, as: .loading)
                 return
             }
             #endif
@@ -433,8 +508,11 @@ final class PlayerViewModel: ObservableObject {
         return nsError.localizedDescription
     }
 
+    /// A live stream that drops is always recoverable — keep reconnecting
+    /// silently. Only surface a failure when there is genuinely nothing to
+    /// reconnect to (no stream/URL, or a codec even VLC can't decode).
     private func reconnectOrFail(_ message: String) {
-        if reconnectAttempts < settings.maxReconnectAttempts, currentStream != nil, currentURL != nil {
+        if currentStream != nil, currentURL != nil {
             reconnect()
         } else {
             state = .failed(message)
@@ -473,7 +551,9 @@ final class PlayerViewModel: ObservableObject {
         // The panel 403s non-Apple user agents (VLC's default is rejected).
         media.addOption(":http-user-agent=AppleCoreMedia/1.0.0")
         media.addOption(":http-reconnect=true")
-        media.addOption(":network-caching=\(Int(settings.liveEdgeOffsetSeconds * 1000))")
+        // 3s jitter buffer: quick zapping, stable playback. (Deriving it
+        // from liveEdgeOffset made VLC pre-buffer for many seconds.)
+        media.addOption(":network-caching=3000")
 
         let player = VLCMediaPlayer()
         player.media = media
@@ -511,7 +591,7 @@ final class PlayerViewModel: ObservableObject {
     /// frame). Restarting the playback creates a correctly-sized vout.
     func videoSurfaceGeometryChanged() {
         guard engine == .vlc, let currentStream, let currentURL else { return }
-        startVLCPlayback(currentStream, url: currentURL, as: .buffering)
+        startVLCPlayback(currentStream, url: currentVLCURL ?? currentURL, as: .buffering)
     }
 
     /// VLC's playback clock advanced — frames are flowing.

@@ -93,6 +93,12 @@ final class ChannelsViewModel: ObservableObject {
         return try client.playbackURL(for: streamID)
     }
 
+    /// Raw MPEG-TS variant for the VLC engine; nil for demo/sample content.
+    func playbackTSURL(for streamID: StreamID) -> URL? {
+        guard !isDemo else { return nil }
+        return try? client.playbackURL(for: streamID, format: .ts)
+    }
+
     func loadCategories() async {
         if isDemo {
             categories = DemoMode.categories

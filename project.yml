@@ -32,6 +32,8 @@ targets:
         buildPhase: resources
       - path: Credits.rtf
         buildPhase: resources
+    dependencies:
+      - package: VLCKitSPM
     info:
       path: Sources/Info.plist
       properties:
@@ -39,8 +41,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "16"
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "17"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.video
@@ -80,8 +82,8 @@ targets:
         # iCloud settings-sync deferred to a 1.1 update (needs the App ID's
         # iCloud container fully provisioned); off for the 1.0 submission.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "16"
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "17"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
@@ -122,8 +124,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "16"
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "17"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:

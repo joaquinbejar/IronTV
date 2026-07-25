@@ -9,6 +9,9 @@ struct PlayerView: View {
     /// Invoked when the user asks for full screen, before the window toggles,
     /// so the browser chrome can hide without waiting for AppKit notifications.
     var onWillToggleFullScreen: (() -> Void)? = nil
+    /// macOS floating mini-player toggle; the toolbar button only appears
+    /// when this is provided.
+    var onToggleFloating: (() -> Void)? = nil
     /// Full-screen mode: no navigation title, no toolbar, edge-to-edge video.
     var hidesChrome: Bool = false
 
@@ -32,7 +35,9 @@ struct PlayerView: View {
         // is torn down mid-playback.
         core
             .ignoresSafeArea(.all, edges: chromeHidden ? .all : [])
-            .navigationTitle(viewModel.currentStream?.name ?? "IronTV")
+            // No navigation title in full screen — on tvOS it renders a large
+            // channel-name overlay across the video.
+            .navigationTitle(chromeHidden ? "" : (viewModel.currentStream?.name ?? "IronTV"))
             .toolbar {
                 if !chromeHidden {
                     ToolbarItem {
@@ -45,6 +50,15 @@ struct PlayerView: View {
                         .disabled(viewModel.currentStream == nil)
                     }
                     #if os(macOS)
+                    if let onToggleFloating {
+                        ToolbarItem {
+                            Button(action: onToggleFloating) {
+                                Image(systemName: "pip.swap")
+                            }
+                            .help("Floating mini player (always on top)")
+                            .disabled(viewModel.currentStream == nil)
+                        }
+                    }
                     ToolbarItem {
                         Button(action: toggleFullScreen) {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -54,6 +68,9 @@ struct PlayerView: View {
                     #endif
                 }
             }
+        #if os(tvOS)
+            .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
+        #endif
         #if os(iOS)
             .statusBarHidden(chromeHidden)
             .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
@@ -69,6 +86,11 @@ struct PlayerView: View {
         #endif
     }
 
+    /// Brief rebuffers are invisible: the buffering/reconnecting overlay only
+    /// appears when the interruption lasts longer than this.
+    private static let overlayDelay: UInt64 = 1_500_000_000
+    @State private var showTransientOverlay = false
+
     private var core: some View {
         ZStack {
             videoSurface
@@ -81,32 +103,40 @@ struct PlayerView: View {
                     .padding(16)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
             case .buffering:
-                ProgressView("Buffering…")
-                    .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                if showTransientOverlay {
+                    ProgressView("Buffering…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                }
             case .reconnecting:
-                ProgressView("Reconnecting…")
-                    .padding(16)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                if showTransientOverlay {
+                    ProgressView("Reconnecting…")
+                        .padding(16)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                }
             case .playing:
                 EmptyView()
             case .failed(let message):
                 errorOverlay(message)
             }
         }
+        .onChange(of: viewModel.state) { state in
+            switch state {
+            case .buffering, .reconnecting:
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: Self.overlayDelay)
+                    if viewModel.state == .buffering || viewModel.state == .reconnecting {
+                        showTransientOverlay = true
+                    }
+                }
+            default:
+                showTransientOverlay = false
+            }
+        }
     }
 
-    @ViewBuilder
     private var videoSurface: some View {
-        #if canImport(VLCKitSPM) && !os(macOS)
-        if viewModel.engine == .vlc {
-            VLCPlayerSurface(viewModel: viewModel)
-        } else {
-            PlayerSurface(player: viewModel.player)
-        }
-        #else
-        PlayerSurface(player: viewModel.player)
-        #endif
+        EngineVideoSurface(viewModel: viewModel)
     }
 
     private func toggleFullScreen() {

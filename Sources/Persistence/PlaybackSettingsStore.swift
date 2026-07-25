@@ -13,6 +13,7 @@ public struct PlaybackSettingsStore {
         static let watchdogInterval = "playback.watchdogIntervalSeconds"
         static let fastStart = "playback.fastStart"
         static let apiTimeout = "playback.apiTimeoutSeconds"
+        static let engine = "playback.preferredEngine"
     }
 
     public init(storage: KeyValueStorage = SyncedStorage.shared) {
@@ -29,7 +30,9 @@ public struct PlaybackSettingsStore {
             maxReconnectAttempts: (storage.object(forKey: Key.maxReconnects) as? Int) ?? fallback.maxReconnectAttempts,
             watchdogIntervalSeconds: double(Key.watchdogInterval) ?? fallback.watchdogIntervalSeconds,
             fastStart: (storage.object(forKey: Key.fastStart) as? Bool) ?? fallback.fastStart,
-            apiTimeoutSeconds: double(Key.apiTimeout) ?? fallback.apiTimeoutSeconds
+            apiTimeoutSeconds: double(Key.apiTimeout) ?? fallback.apiTimeoutSeconds,
+            preferredEngine: (storage.object(forKey: Key.engine) as? String)
+                .flatMap(PlaybackEngineOption.init(rawValue:)) ?? fallback.preferredEngine
         )
     }
 
@@ -42,11 +45,12 @@ public struct PlaybackSettingsStore {
         storage.set(settings.watchdogIntervalSeconds, forKey: Key.watchdogInterval)
         storage.set(settings.fastStart, forKey: Key.fastStart)
         storage.set(settings.apiTimeoutSeconds, forKey: Key.apiTimeout)
+        storage.set(settings.preferredEngine.rawValue, forKey: Key.engine)
     }
 
     public func reset() {
         [Key.forwardBuffer, Key.liveEdgeOffset, Key.waitingTimeout, Key.frozenTimeout,
-         Key.maxReconnects, Key.watchdogInterval, Key.fastStart, Key.apiTimeout]
+         Key.maxReconnects, Key.watchdogInterval, Key.fastStart, Key.apiTimeout, Key.engine]
             .forEach(storage.removeObject(forKey:))
     }
 
