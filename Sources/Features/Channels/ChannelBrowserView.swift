@@ -7,6 +7,7 @@ import AppKit
 struct ChannelBrowserView: View {
     @StateObject private var channels: ChannelsViewModel
     @StateObject private var player = PlayerViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var isFullScreen = false
     #if !os(macOS)
@@ -56,6 +57,18 @@ struct ChannelBrowserView: View {
                 #endif
                 player.stop()
             }
+            #if !os(macOS)
+            .onChange(of: scenePhase) { _, phase in
+                // Background = release the provider slot and every reconnect
+                // task; a suspended scene must not hold a live connection.
+                // `.inactive` is transient (app switcher, control center) and
+                // deliberately ignored. Resume policy: no auto-play — the
+                // selection is retained, replay is one tap (documented).
+                if phase == .background {
+                    player.stop()
+                }
+            }
+            #endif
             #if os(macOS)
             // Hand the floating player this window explicitly, so entering
             // mini-player mode hides and restores the browser rather than

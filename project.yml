@@ -106,6 +106,10 @@ targets:
         CFBundleVersion: "19"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
+        # Single playback scene: every window is a provider connection slot
+        # (issue #10). macOS enforces this with a unique Window scene.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

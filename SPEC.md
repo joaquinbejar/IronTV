@@ -63,7 +63,7 @@ Sources/
     Channels/             // sidebar: categories -> channel list (LazyVStack, async icons)
     Player/               // AVPlayer wrapper view + error surface
   App/
-    IronTVApp.swift
+    IronTVApp.swift       # single playback scene (one provider slot); bg = stop
 ```
 
 MVVM-lite: one observable view model per feature, `XtreamClient` injected. No external architecture frameworks.
