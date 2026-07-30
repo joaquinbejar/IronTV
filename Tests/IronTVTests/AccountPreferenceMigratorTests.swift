@@ -54,6 +54,17 @@ final class AccountPreferenceMigratorTests: XCTestCase {
         XCTAssertEqual(LastChannelStore(identity: httpsAccount.identity, storage: defaults).lastStreamID, StreamID(42))
     }
 
+    func testADeliberatelyEmptiedFavoritesListIsNotResurrected() {
+        FavoritesStore(account: httpAccount, storage: defaults).save([StreamID(7)])
+        // The user removed every favorite: the key exists and holds [].
+        FavoritesStore(account: httpsAccount, storage: defaults).save([])
+
+        AccountPreferenceMigrator.migrate(from: httpAccount, to: httpsAccount, storage: defaults)
+
+        XCTAssertTrue(FavoritesStore(account: httpsAccount, storage: defaults).load().isEmpty,
+                      "migration must not overwrite an intentionally empty list")
+    }
+
     func testNoOpWhenTheOldNamespaceHoldsNothing() {
         AccountPreferenceMigrator.migrate(from: httpAccount, to: httpsAccount, storage: defaults)
 

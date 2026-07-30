@@ -20,7 +20,10 @@
 
 <p>IronTV ("the app") is a media player for Xtream Codes IPTV services. This
 policy explains what the app does and does not do with your information. In
-short: <strong>IronTV does not collect, transmit, or share any personal data.</strong></p>
+short: <strong>the developer of IronTV never collects, receives, or shares any
+of your data.</strong> The app itself transmits data only to services you choose
+— your IPTV provider, the public sample-stream hosts while you use sample mode,
+and optionally your own iCloud account — exactly as described below.</p>
 
 <h2>Information the app handles</h2>
 <p>To connect to your IPTV provider, IronTV needs the playlist URL you paste in
@@ -57,8 +60,10 @@ how you use it, it connects to:</p>
       sample mode (no account configured), the app plays public test streams
       from Apple (<code>devstreaming-cdn.apple.com</code>), Mux
       (<code>test-streams.mux.dev</code>) and Unified Streaming
-      (<code>demo.unified-streaming.com</code>). No account data exists in this
-      mode, and nothing about you is sent — these are plain video requests.</li>
+      (<code>demo.unified-streaming.com</code>). No account credentials are
+      sent — no account exists in this mode. Like any web request, these hosts
+      receive ordinary connection metadata such as your IP address, the
+      player's user agent, and request timing.</li>
   <li><strong>Apple iCloud</strong> — optionally, your credentials sync through
       your private iCloud Keychain and your preferences (favorites, last
       channel, playback settings) through iCloud key-value storage, both under

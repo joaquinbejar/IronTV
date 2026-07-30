@@ -108,7 +108,10 @@ public struct XtreamClient: Sendable {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            // The URL carries credentials in the query: refuse any redirect
+            // off this origin (https→http downgrade, host switch) instead of
+            // silently following it — see SameOriginRedirectPolicy.
+            (data, response) = try await session.data(for: request, delegate: SameOriginRedirectPolicy())
         } catch let error as URLError {
             throw XtreamAPIError.network(error)
         }

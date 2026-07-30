@@ -11,7 +11,10 @@ public enum AccountPreferenceMigrator {
     /// stored under the new namespace is never clobbered.
     public static func migrate(from old: Account, to new: Account, storage: KeyValueStorage = SyncedStorage.shared) {
         let newFavorites = FavoritesStore(account: new, storage: storage)
-        if newFavorites.load().isEmpty {
+        // Key existence, not loaded content: a stored empty list means the
+        // user deliberately removed every favorite, and migration must not
+        // resurrect the old ones over that choice.
+        if storage.object(forKey: newFavorites.storageKey) == nil {
             let favorites = FavoritesStore(account: old, storage: storage).load()
             if !favorites.isEmpty {
                 newFavorites.save(favorites)

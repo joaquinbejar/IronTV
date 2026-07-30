@@ -472,6 +472,37 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(spy.callCount, 1)
     }
 
+    func testTLSHTTPStatusRejectionFailsWithoutOfferingPlaintext() async {
+        let store = FakeAccountStore()
+        for code in [401, 403] {
+            let (viewModel, spy) = makeViewModel(resultsByScheme: [
+                "https": .failure(XtreamAPIError.httpStatus(code)),
+                "http": .success(authenticated()),
+            ])
+
+            viewModel.urlText = validURL
+            await viewModel.validateAndSave(into: AppModel(store: store))
+
+            XCTAssertEqual(viewModel.phase, .failure("The panel rejected these credentials (HTTP \(code))."))
+            XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"], "an explicit TLS rejection must not offer a plaintext retry")
+            XCTAssertNil(store.saved)
+        }
+    }
+
+    func testTLSTransportFailureStillReachesTheConfirmation() async {
+        // A 5xx or connection failure says nothing about the credentials —
+        // the compatibility confirmation must stay available.
+        let (viewModel, _) = makeViewModel(resultsByScheme: [
+            "https": .failure(XtreamAPIError.httpStatus(503)),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: AppModel(store: FakeAccountStore()))
+
+        XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
+    }
+
     func testTLSRejectionFailsWithoutFallingBackToPlaintext() async {
         let store = FakeAccountStore()
         let (viewModel, spy) = makeViewModel(resultsByScheme: [

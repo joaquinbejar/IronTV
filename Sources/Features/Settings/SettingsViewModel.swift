@@ -186,18 +186,36 @@ final class SettingsViewModel: ObservableObject {
                 // the warning never has to appear at all.
                 if let secured = Self.httpsVariant(of: account) {
                     let probe = makeClient(secured, min(timeout, Self.httpsProbeTimeout))
-                    if let probed = try? await probe.accountStatus() {
-                        guard isStillCurrent(submitted) else { return }
-                        if probed.authenticated {
-                            resolved = secured
-                            status = probed
-                        } else {
-                            // The panel answered authoritatively over TLS and
-                            // refused these credentials — plaintext would change
-                            // nothing except exposing them.
-                            phase = .failure(Self.rejectionMessage(for: probed))
-                            return
-                        }
+                    let outcome: Result<AccountStatus, Error>
+                    do {
+                        outcome = .success(try await probe.accountStatus())
+                    } catch {
+                        outcome = .failure(error)
+                    }
+                    guard isStillCurrent(submitted) else { return }
+
+                    switch outcome {
+                    case .success(let probed) where probed.authenticated:
+                        resolved = secured
+                        status = probed
+                    case .success(let probed):
+                        // The panel answered authoritatively over TLS and
+                        // refused these credentials — plaintext would change
+                        // nothing except exposing them.
+                        phase = .failure(Self.rejectionMessage(for: probed))
+                        return
+                    case .failure(XtreamAPIError.httpStatus(let code)) where code == 401 || code == 403:
+                        // Same authority, HTTP-level: an explicit credential
+                        // rejection over TLS must never turn into an offer to
+                        // retry in the clear.
+                        phase = .failure("The panel rejected these credentials (HTTP \(code)).")
+                        return
+                    case .failure(is CancellationError):
+                        return
+                    case .failure:
+                        // Transport-level failure — no TLS endpoint answered;
+                        // fall through to the confirmation below.
+                        break
                     }
                 }
                 guard isStillCurrent(submitted) else { return }
