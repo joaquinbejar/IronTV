@@ -71,17 +71,12 @@ struct LicenseTab: View {
 struct AccountSettingsTab: View {
     @EnvironmentObject private var appModel: AppModel
     @StateObject private var viewModel = SettingsViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Form {
             Section {
-                TextField(
-                    "Playlist URL",
-                    text: $viewModel.urlText,
-                    prompt: Text("http://host.example.com:8080/get.php?username=…&password=…")
-                )
-                .autocorrectionDisabled()
-                .onSubmit(submit)
+                playlistURLField
 
                 HStack {
                     Button("Validate & Save", action: submit)
@@ -92,7 +87,7 @@ struct AccountSettingsTab: View {
             } header: {
                 Text("Account")
             } footer: {
-                Text("Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded.")
+                Text("Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.")
                     .foregroundStyle(.secondary)
             }
 
@@ -107,6 +102,60 @@ struct AccountSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onDisappear { viewModel.formDismissed() }
+        .onChange(of: scenePhase) { _, phase in
+            // Backgrounding can snapshot the window; don't leave a password
+            // sitting in the field for it.
+            if phase == .background {
+                viewModel.formDismissed()
+            }
+        }
+    }
+
+    /// Obscured by default, with an explicit reveal. Both variants keep paste
+    /// working and take the characters exactly as pasted — no autocorrection and
+    /// no autocapitalization, which would corrupt a credential.
+    @ViewBuilder
+    private var playlistURLField: some View {
+        let prompt = Text("http://host.example.com:8080/get.php?username=…&password=…")
+
+        HStack {
+            Group {
+                if viewModel.isRevealingURL {
+                    TextField("Playlist URL", text: $viewModel.urlText, prompt: prompt)
+                } else {
+                    SecureField("Playlist URL", text: $viewModel.urlText, prompt: prompt)
+                }
+            }
+            .autocorrectionDisabled()
+            #if os(iOS) || os(tvOS)
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+            .textContentType(.URL)
+            #endif
+            .onSubmit(submit)
+
+            revealToggle
+        }
+    }
+
+    @ViewBuilder
+    private var revealToggle: some View {
+        let label = viewModel.isRevealingURL ? "Hide playlist URL" : "Show playlist URL"
+        #if os(tvOS)
+        // The focus engine needs a real, labelled control here.
+        Button(viewModel.isRevealingURL ? "Hide" : "Show") { viewModel.toggleURLReveal() }
+            .accessibilityLabel(label)
+        #else
+        Button {
+            viewModel.toggleURLReveal()
+        } label: {
+            Image(systemName: viewModel.isRevealingURL ? "eye.slash" : "eye")
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+        #endif
     }
 
     private func submit() {
