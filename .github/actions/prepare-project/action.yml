@@ -1,0 +1,39 @@
+name: Prepare project
+description: >-
+  Install XcodeGen, restore the SwiftPM cache, generate IronTV.xcodeproj from
+  project.yml, and record the toolchain in the job summary.
+
+runs:
+  using: composite
+  steps:
+    - name: Install XcodeGen
+      shell: bash
+      run: brew install --quiet xcodegen
+
+    # SwiftPM's download cache only. The generated .xcodeproj and any build
+    # products are deliberately NOT cached: a stale generated project is exactly
+    # the class of bug this CI exists to catch, so it is regenerated every run.
+    # Keyed on project.yml, which is where the pinned dependency version lives.
+    - name: Restore SwiftPM cache
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/org.swift.swiftpm
+        key: swiftpm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+        restore-keys: swiftpm-${{ runner.os }}-
+
+    - name: Generate project
+      shell: bash
+      run: xcodegen generate
+
+    - name: Record toolchain
+      shell: bash
+      run: |
+        {
+          echo "### Toolchain — ${{ runner.os }} / ${{ runner.arch }}"
+          echo '```'
+          sw_vers
+          xcodebuild -version
+          swift --version 2>&1 | head -1
+          echo "XcodeGen $(xcodegen --version)"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"

@@ -34,6 +34,40 @@ xcodebuild -scheme IronTV-tvOS -destination 'generic/platform=tvOS' CODE_SIGNING
 
 `project.yml` is the source of truth — never edit the `.xcodeproj` directly. Re-run `xcodegen generate` after adding/removing source files.
 
+### Toolchain
+
+| Tool | Local (developed against) | CI (blocking gate) |
+|------|---------------------------|--------------------|
+| macOS | 26.x | `macos-15` runner image |
+| Xcode | 26.6 | image default (Xcode 16.x) |
+| Swift | 6.3 (language mode 5) | image default |
+| XcodeGen | 2.46 | latest from Homebrew |
+
+CI regenerates the project from `project.yml` on every run and never caches the
+generated `.xcodeproj` or build products — a stale generated project is exactly
+what it exists to catch. It also runs a build and test pass on `macos-latest` and
+a `SWIFT_STRICT_CONCURRENCY=complete` pass, both **informational**: they surface a
+new Xcode or the outstanding concurrency-migration warnings (issue #17) without
+turning unrelated PRs red.
+
+### Dependencies
+
+VLCKit (via [`vlckit-spm`](https://github.com/tylerjonesio/vlckit-spm)) is the only
+third-party dependency, pinned to an **exact** version in `project.yml`. It is a
+binary LGPL framework embedded in the shipped app, and the generated
+`Package.resolved` is gitignored along with the `.xcodeproj`, so that pin is the
+only thing making a clean checkout reproducible.
+
+Updating it is a reviewed change, not a routine bump:
+
+1. Change `exactVersion` in `project.yml` and run `xcodegen generate`.
+2. Build and test all three targets.
+3. Confirm the framework is still **dynamically** linked — static linking would
+   break the LGPL terms (see issue #7).
+4. Note the new version and why it changed in the PR description.
+
+Adding any other dependency needs explicit approval first.
+
 ### Distribution (macOS)
 
 ```bash
