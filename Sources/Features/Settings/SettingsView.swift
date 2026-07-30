@@ -253,7 +253,7 @@ struct PlaybackSettingsTab: View {
             } header: {
                 Text("Engine")
             } footer: {
-                Text("Automatic starts with the Apple player and silently switches a channel to the VLC engine (raw MPEG-TS, like most IPTV apps) when it keeps stalling or uses unsupported codecs.")
+                Text("Automatic starts with the Apple player and silently switches a channel to the VLC engine (raw MPEG-TS, like most IPTV apps) when it keeps stalling or uses unsupported codecs. The player shows which engine is active in its toolbar.")
                     .foregroundStyle(.secondary)
             }
 
@@ -262,17 +262,23 @@ struct PlaybackSettingsTab: View {
                 secondsStepper("Live delay (stall cushion)", value: $model.settings.liveEdgeOffsetSeconds, in: PlaybackSettings.liveEdgeOffsetRange, step: 5)
                 Toggle("Fast start (may stutter on weak connections)", isOn: $model.settings.fastStart)
             } header: {
-                Text("Buffering")
+                Text("Buffering (Apple engine)")
             } footer: {
-                Text("A larger live delay starts playback further behind the live edge, absorbing network hiccups at the cost of being more seconds behind the broadcast. It is automatically capped to a third of the panel's live window.")
+                Text("These apply to the Apple engine only — the VLC engine uses a fixed 3-second network cache. A larger live delay starts playback further behind the live edge, absorbing network hiccups at the cost of being more seconds behind the broadcast; it is automatically capped to a third of the panel's live window.")
                     .foregroundStyle(.secondary)
             }
+            .disabled(model.settings.preferredEngine == .vlc)
 
-            Section("Auto-reconnect") {
+            Section {
                 secondsStepper("Reconnect after buffering for", value: $model.settings.waitingTimeoutSeconds, in: PlaybackSettings.waitingTimeoutRange, step: 1)
                 secondsStepper("Reconnect after frozen video for", value: $model.settings.frozenTimeoutSeconds, in: PlaybackSettings.frozenTimeoutRange, step: 1)
                 secondsStepper("Health check interval", value: $model.settings.watchdogIntervalSeconds, in: PlaybackSettings.watchdogIntervalRange, step: 1)
-                intStepper("Max reconnect attempts", value: $model.settings.maxReconnectAttempts, in: PlaybackSettings.maxReconnectAttemptsRange)
+                intStepper("Fast reconnect attempts", value: $model.settings.maxReconnectAttempts, in: PlaybackSettings.maxReconnectAttemptsRange)
+            } header: {
+                Text("Auto-reconnect")
+            } footer: {
+                Text("After the fast attempts, IronTV keeps retrying indefinitely at a slower, capped cadence — a live stream never gives up. Reconnect pacing applies to both engines; buffering and frozen-video detection are Apple-engine health checks.")
+                    .foregroundStyle(.secondary)
             }
 
             Section("Network") {

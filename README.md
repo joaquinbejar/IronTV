@@ -17,7 +17,21 @@ Native IPTV player for [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes
   - stall watchdog: detects stuck buffering, frozen video (even while audio keeps playing), and dead streams; recovers via seek-to-live first, full reconnect second
   - manual audio/video resync button
   - video-only full screen
-- **Tunable playback settings** — buffer sizes, reconnect timeouts, health-check interval, fast start, API timeout; synced via iCloud key-value store (entitlement pending).
+- **Tunable playback settings** — synced via iCloud key-value store. Each option, its engine scope and trade-off:
+
+  | Setting | Default | Range | Engine | Trade-off |
+  |---------|---------|-------|--------|-----------|
+  | Forward buffer | 30 s | 5–120 s | Apple | more resilience vs. more memory/latency |
+  | Live delay (stall cushion) | 10 s | 0–60 s | Apple | absorbs hiccups vs. seconds behind live (auto-capped to ⅓ of the panel window) |
+  | Fast start | on | — | Apple | faster zapping vs. possible stutter on weak links |
+  | Reconnect after buffering | 8 s | 2–60 s | Apple health check | patience vs. faster recovery |
+  | Reconnect after frozen video | 6 s | 2–60 s | Apple health check | tolerance vs. faster recovery |
+  | Health check interval | 2 s | 1–10 s | Apple | detection latency vs. overhead |
+  | Fast reconnect attempts | 5 | 1–10 | both | immediate retries before the indefinite slower cadence (never a terminal limit) |
+  | API request timeout | 30 s | 5–120 s | both (JSON API) | slow panels vs. snappy failures |
+  | Engine | Automatic | auto/Apple/VLC | — | Automatic falls back to VLC per channel; the active engine shows in the player toolbar |
+
+  The VLC engine uses a fixed 3-second network cache (not user-configurable — deriving it from the live delay made VLC pre-buffer for many seconds).
 - **Credential hygiene** — credentials live only in the Keychain; logged URLs are redacted.
 - **Transport security** — HTTPS is preferred: when an `http://` playlist URL is pasted, the app first probes the same server over TLS and silently saves the HTTPS endpoint if it answers; otherwise sending credentials over plain HTTP requires an explicit confirmation, and the panel-API transport state is shown in Settings (stream playback follows the URLs the panel serves — the media engines expose no redirect enforcement). As a post-hoc guard, the AVPlayer watchdog inspects the item's access log and stops playback with a typed error when media requests move to plain HTTP or another origin; detection, not prevention — and the VLC engine exposes no access log, so this watch covers the Apple engine only. ATS remains open (`NSAllowsArbitraryLoads`) by design — the provider host is entered at runtime, so a per-host exception is impossible (rationale documented in `project.yml`).
 
