@@ -10,9 +10,12 @@ struct RootView: View {
 
     var body: some View {
         if let account = appModel.account {
-            // Keyed by host so the browser fully resets on account change.
+            // Keyed by the full account identity — host, username and a
+            // fingerprint of the password — so the browser, its XtreamClient
+            // and its caches are rebuilt whenever any credential changes and
+            // never keep serving the previous account.
             ChannelBrowserView(account: account)
-                .id(account.host)
+                .id(account.identity)
         } else {
             // Full-window empty state — no split view, so it works on
             // compact (iPhone) layouts too.

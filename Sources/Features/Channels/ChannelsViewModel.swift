@@ -47,10 +47,12 @@ final class ChannelsViewModel: ObservableObject {
     private let isDemo: Bool
     private var favoritesSyncObserver: NSObjectProtocol?
 
-    init(account: Account, lastChannel: LastChannelStore = LastChannelStore()) {
+    /// `lastChannel` defaults to a store scoped to this account, so the browser
+    /// can never restore another provider's category or stream.
+    init(account: Account, lastChannel: LastChannelStore? = nil) {
         let settings = PlaybackSettingsStore().load()
         self.client = XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
-        self.lastChannel = lastChannel
+        self.lastChannel = lastChannel ?? LastChannelStore(identity: account.identity)
         self.favoritesStore = FavoritesStore(account: account)
         self.isDemo = DemoMode.isActive || account == DemoMode.account
         self.favorites = isDemo ? DemoMode.favoriteIDs : favoritesStore.load()

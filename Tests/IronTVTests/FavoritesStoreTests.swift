@@ -33,6 +33,27 @@ final class FavoritesStoreTests: XCTestCase {
         XCTAssertTrue(store.load().isEmpty)
     }
 
+    /// Favorites are already synced to iCloud under this exact key. Rebuilding it
+    /// from `AccountIdentity` must not change the string, or shipped users lose
+    /// their favorites on update.
+    func testStorageKeyMatchesTheKeyShippedBeforeAccountIdentity() {
+        let store = FavoritesStore(account: account, storage: defaults)
+
+        XCTAssertEqual(store.storageKey, "favorites.http://host.example.com:8080.user1")
+        XCTAssertFalse(store.storageKey.contains(account.password))
+    }
+
+    /// A password rotation is the same account — favorites must survive it.
+    func testFavoritesSurviveAPasswordRotation() {
+        let store = FavoritesStore(account: account, storage: defaults)
+        store.save([StreamID(1001)])
+
+        let rotated = Account(host: account.host, username: account.username, password: "rotated")
+        let rotatedStore = FavoritesStore(account: rotated, storage: defaults)
+
+        XCTAssertEqual(rotatedStore.load(), [StreamID(1001)])
+    }
+
     func testFavoritesAreScopedPerAccount() {
         let other = Account(host: account.host, username: "user2", password: "pass2")
         let store = FavoritesStore(account: account, storage: defaults)
