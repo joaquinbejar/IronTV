@@ -13,7 +13,7 @@ final class SettingsViewModel: ObservableObject {
     /// Success copy for the three shapes a panel reports: a future expiry, no
     /// known expiry (missing/zero/garbage `exp_date`, sanitized to `nil` in the
     /// DTO mapping), and the inconsistent case where authentication succeeded
-    /// but the reported expiry is already past.
+    /// but the reported expiry is not in the future.
     static func successMessage(expiryDate: Date?, now: Date = Date()) -> String {
         guard let expiryDate else { return "Account valid (no expiry reported)" }
         let formatted = expiryDate.formatted(date: .abbreviated, time: .omitted)
