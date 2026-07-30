@@ -79,16 +79,18 @@ fi
 
 # 5. .env must stay ignored, so an accidental `git add` is refused rather than
 #    silently staged. Uses a temp file so the check works on a clean checkout.
+#    Only ever creates the probe when there is no real .env to clobber, and
+#    removes it from an EXIT trap: under `set -e` an unexpected failure — or an
+#    interrupt — must not leave a stray .env behind in someone's checkout.
 if [[ ! -f .env ]]; then
     printf 'PROBE=1\n' > .env
-    created_probe=1
+    trap 'rm -f "$REPO/.env"' EXIT
 fi
 if git check-ignore -q .env; then
     echo "✓ .env is ignored"
 else
     report ".env is NOT covered by .gitignore"
 fi
-[[ "${created_probe:-0}" == 1 ]] && rm -f .env
 
 if [[ $fail -eq 0 ]]; then
     echo "✓ secret scan clean"
