@@ -17,6 +17,7 @@ struct VLCPlayerSurface: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
+        viewModel.noteVideoSurfaceSize(nsView.bounds.size)
         if let player = viewModel.vlcPlayer, (player.drawable as? NSView) !== nsView {
             player.drawable = nsView
         }
@@ -34,6 +35,7 @@ struct VLCPlayerSurface: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
+        viewModel.noteVideoSurfaceSize(uiView.bounds.size)
         if let player = viewModel.vlcPlayer, (player.drawable as? UIView) !== uiView {
             player.drawable = uiView
         }

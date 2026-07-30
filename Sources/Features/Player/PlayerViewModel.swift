@@ -179,6 +179,13 @@ final class PlayerViewModel: ObservableObject {
     /// First recovery is a cheap seek to the live edge; reconnect only if the
     /// freeze persists after that.
     private var attemptedSeekRecovery = false
+    /// Latest video-surface size, reported by the platform views. Lets the
+    /// geometry restart skip when the layout didn't materially change.
+    private(set) var currentSurfaceSize: CGSize = .zero
+    /// Baseline for geometry decisions: the size at the last VLC (re)start,
+    /// or the first size the surface reported for this session. Internal so
+    /// tests can assert the seeding rules.
+    private(set) var lastGeometryRestartSize: CGSize?
 
     private func configureTimeControlObservation() {
         let generation = playbackGeneration
@@ -270,6 +277,7 @@ final class PlayerViewModel: ObservableObject {
     func stop() {
         playbackGeneration &+= 1
         transportCheckedURICount = 0
+        lastGeometryRestartSize = nil
         cancelScheduledRetry()
         teardown.setTimer(nil)
         stopVLC()
@@ -680,6 +688,10 @@ final class PlayerViewModel: ObservableObject {
 
         engine = .vlc
         currentStream = stream
+        // Every VLC start defines the geometry baseline: only a MATERIAL size
+        // change after this point justifies a geometry restart. Unknown (the
+        // surface hasn't reported yet) stays nil so the first report seeds it.
+        lastGeometryRestartSize = currentSurfaceSize == .zero ? nil : currentSurfaceSize
         // Deliberately NOT overwriting currentURL: it keeps the original HLS
         // identity so retry() and an AVPlayer reconnect recover the right
         // stream — `url` here is usually the raw TS variant.
@@ -744,8 +756,29 @@ final class PlayerViewModel: ObservableObject {
     /// Orientation changed: VLC's GL output sizes its buffers off the main
     /// thread and often keeps the old geometry (small video in a black
     /// frame). Restarting the playback creates a correctly-sized vout.
+    /// Reported from the video surface views on layout passes. The first
+    /// report after a VLC start seeds the geometry baseline — layout
+    /// *reporting* is not a geometry *change*, so the view's task(id:) firing
+    /// on appearance cannot restart a session that never rotated.
+    func noteVideoSurfaceSize(_ size: CGSize) {
+        currentSurfaceSize = size
+        if engine == .vlc, lastGeometryRestartSize == nil || lastGeometryRestartSize == .zero {
+            lastGeometryRestartSize = size
+        }
+    }
+
+    /// Whether a restart is worth a new connection: >1pt in either dimension.
+    nonisolated static func geometryMateriallyChanged(from last: CGSize?, to current: CGSize) -> Bool {
+        guard let last else { return true }
+        return abs(last.width - current.width) > 1 || abs(last.height - current.height) > 1
+    }
+
     func videoSurfaceGeometryChanged() {
         guard engine == .vlc, let currentStream, let currentURL else { return }
+        // A restart is a new provider connection — skip when the surface size
+        // didn't materially change (chrome toggles with identical bounds).
+        guard Self.geometryMateriallyChanged(from: lastGeometryRestartSize, to: currentSurfaceSize) else { return }
+        lastGeometryRestartSize = currentSurfaceSize
         startVLCPlayback(currentStream, url: currentVLCURL ?? currentURL, as: .buffering)
     }
 

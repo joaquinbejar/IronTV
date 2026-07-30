@@ -243,6 +243,45 @@ final class PlayerViewModelReconnectTests: XCTestCase {
         XCTAssertEqual(viewModel.currentURL, hlsURL)
     }
 
+    // MARK: - Geometry restarts
+
+    func testGeometryMaterialityRules() {
+        XCTAssertTrue(PlayerViewModel.geometryMateriallyChanged(from: nil, to: CGSize(width: 100, height: 100)),
+                      "the first geometry event always counts")
+        XCTAssertFalse(PlayerViewModel.geometryMateriallyChanged(from: CGSize(width: 100, height: 100), to: CGSize(width: 100.5, height: 99.5)),
+                       "sub-point jitter must not cost a new provider connection")
+        XCTAssertTrue(PlayerViewModel.geometryMateriallyChanged(from: CGSize(width: 100, height: 100), to: CGSize(width: 250, height: 100)))
+        XCTAssertTrue(PlayerViewModel.geometryMateriallyChanged(from: CGSize(width: 100, height: 100), to: CGSize(width: 100, height: 300)))
+    }
+
+    /// The review's initial-appearance scenario: reporting a size must never
+    /// count as a geometry change outside a VLC session, and the AV engine
+    /// never seeds a baseline.
+    @MainActor
+    func testSurfaceReportsOutsideVLCDoNotSeedTheGeometryBaseline() {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, _) = makePrimed(recorder: recorder, clock: clock)
+
+        viewModel.noteVideoSurfaceSize(CGSize(width: 800, height: 600))
+
+        XCTAssertNil(viewModel.lastGeometryRestartSize, "only a VLC session seeds the baseline")
+        XCTAssertEqual(viewModel.currentSurfaceSize, CGSize(width: 800, height: 600))
+    }
+
+    @MainActor
+    func testGeometryChangeOutsideVLCIsANoOp() async {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, attempts) = makePrimed(recorder: recorder, clock: clock)
+        viewModel.noteVideoSurfaceSize(CGSize(width: 800, height: 600))
+
+        viewModel.videoSurfaceGeometryChanged() // engine is .avPlayer
+
+        XCTAssertTrue(attempts().isEmpty)
+        XCTAssertEqual(viewModel.state, .idle, "a geometry event on the AV engine must change nothing")
+    }
+
     // MARK: - Stale VLC callbacks
 
     #if canImport(VLCKitSPM)
