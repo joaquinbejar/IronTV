@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Security
 
 public enum KeychainError: Error, Equatable, LocalizedError {
@@ -40,9 +41,14 @@ public struct KeychainStore {
 
     private let service: String
     private let accountName = "xtream-account"
+    private let client: SecItemClient
 
-    public init(service: String = "com.taunais.irontv") {
+    /// Status codes only — never credential data (see the migration catch).
+    private static let logger = Logger(subsystem: "com.taunais.irontv", category: "keychain")
+
+    public init(service: String = "com.taunais.irontv", client: SecItemClient = SystemSecItemClient()) {
         self.service = service
+        self.client = client
     }
 
     public func saveAccount(_ account: Account) throws {
@@ -69,18 +75,24 @@ public struct KeychainStore {
             query[kSecReturnData as String] = true
             query[kSecMatchLimit as String] = kSecMatchLimitOne
 
-            var result: CFTypeRef?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            let (status, result) = client.copyMatching(query)
             switch status {
             case errSecSuccess:
-                guard let data = result as? Data,
+                guard let data = result,
                       let account = try? JSONDecoder().decode(Account.self, from: data) else {
                     throw KeychainError.corruptedData
                 }
                 if backend == .legacy {
                     // One-time migration: re-store in the data-protection
                     // Keychain so later writes aren't blocked by the old ACL.
-                    try? saveAccount(account)
+                    // Idempotent — the legacy item is only purged after the
+                    // data-protection write succeeds, so a failure here simply
+                    // retries on the next load.
+                    do {
+                        try saveAccount(account)
+                    } catch {
+                        Self.logger.notice("Legacy Keychain migration failed; will retry on next load: \(String(describing: error), privacy: .public)")
+                    }
                 }
                 return account
             case errSecItemNotFound, errSecMissingEntitlement:
@@ -95,7 +107,7 @@ public struct KeychainStore {
     public func deleteAccount() throws {
         var lastStatus = errSecSuccess
         for backend in Self.backends {
-            let status = SecItemDelete(baseQuery(backend) as CFDictionary)
+            let status = client.delete(baseQuery(backend))
             switch status {
             case errSecSuccess, errSecItemNotFound, errSecMissingEntitlement:
                 continue
@@ -109,28 +121,29 @@ public struct KeychainStore {
     }
 
     private func write(_ data: Data, to backend: Backend) -> OSStatus {
-        // Delete first so a stale item can't collide. A failure here is not
-        // fatal — the add/update below still gets its chance.
-        _ = SecItemDelete(baseQuery(backend) as CFDictionary)
+        // Update-first: never delete the only stored credential. An in-place
+        // update either succeeds or leaves the previous item intact — the old
+        // delete-then-add flow could destroy the account when the delete
+        // succeeded and the add then failed.
+        let updated = client.update(baseQuery(backend), [kSecValueData as String: data])
+        guard updated == errSecItemNotFound else { return updated }
 
         var attributes = baseQuery(backend, synchronizable: true)
         attributes[kSecValueData as String] = data
         attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
 
-        var status = SecItemAdd(attributes as CFDictionary, nil)
+        var status = client.add(attributes)
         if status == errSecMissingEntitlement {
             // Synchronizable items need an application-identifier entitlement
             // (provisioning profile). Developer ID builds don't have one —
             // store the account locally instead of failing.
             attributes[kSecAttrSynchronizable as String] = false
-            status = SecItemAdd(attributes as CFDictionary, nil)
+            status = client.add(attributes)
         }
         if status == errSecDuplicateItem {
-            // The delete above was denied: update the existing item in place.
-            status = SecItemUpdate(
-                baseQuery(backend) as CFDictionary,
-                [kSecValueData as String: data] as CFDictionary
-            )
+            // An item appeared between the update and the add (racing writer,
+            // or an item the initial update couldn't match): update in place.
+            status = client.update(baseQuery(backend), [kSecValueData as String: data])
         }
         return status
     }
@@ -143,7 +156,7 @@ public struct KeychainStore {
         #if os(macOS)
         // Restricted to non-synchronizable items: legacy queries can reach
         // iCloud-synced items, and this must never race the write above.
-        _ = SecItemDelete(baseQuery(.legacy, synchronizable: false) as CFDictionary)
+        _ = client.delete(baseQuery(.legacy, synchronizable: false))
         #endif
     }
 

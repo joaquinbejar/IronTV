@@ -9,17 +9,21 @@ struct RootView: View {
     #endif
 
     var body: some View {
-        if let account = appModel.account {
+        switch appModel.availability {
+        case .loaded(let account?):
             // Keyed by the full account identity — host, username and a
             // fingerprint of the password — so the browser, its XtreamClient
             // and its caches are rebuilt whenever any credential changes and
             // never keep serving the previous account.
             ChannelBrowserView(account: account)
                 .id(account.identity)
-        } else {
+        case .loaded(nil):
             // Full-window empty state — no split view, so it works on
             // compact (iPhone) layouts too.
             noAccountView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let message):
+            AccountLoadFailureView(message: message)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -36,6 +40,51 @@ struct RootView: View {
             SettingsView()
         }
         #endif
+    }
+}
+
+/// Shown when the stored account exists but could not be read — a distinct,
+/// recoverable state, never silently rendered as "no account configured".
+private struct AccountLoadFailureView: View {
+    @EnvironmentObject private var appModel: AppModel
+    let message: String
+    @State private var recoveryError: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 44))
+                .foregroundStyle(.orange)
+            Text("Couldn't read the saved account")
+                .font(.title3.bold())
+            Text(message)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text("If this started after reinstalling or updating the app, removing the stored account and adding it again resolves it.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Try Again") {
+                recoveryError = nil
+                appModel.reloadAccount()
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Remove Stored Account", role: .destructive) {
+                do {
+                    try appModel.discardUnreadableAccount()
+                    recoveryError = nil
+                } catch {
+                    recoveryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                }
+            }
+            .buttonStyle(.bordered)
+            if let recoveryError {
+                Label(recoveryError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(40)
     }
 }
 
