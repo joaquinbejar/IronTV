@@ -35,6 +35,14 @@ final class PlaybackTransportPolicyTests: XCTestCase {
         XCTAssertEqual(verdict("", origin: httpOrigin), .acceptable)
     }
 
+    /// Absolute non-web or hostless URIs can never be the planned origin.
+    func testAbsoluteNonWebURIsAreViolations() {
+        XCTAssertEqual(verdict("file:///etc/passwd", origin: httpOrigin), .crossOrigin)
+        XCTAssertEqual(verdict("data:text/plain;base64,QQ==", origin: httpOrigin), .crossOrigin)
+        XCTAssertEqual(verdict("rtmp://host.example.com/live", origin: httpOrigin), .crossOrigin)
+        XCTAssertEqual(verdict("http:///hostless/path", origin: httpOrigin), .crossOrigin)
+    }
+
     func testFirstViolationScansTheWholeBatch() {
         let uris = [
             "segments/1.ts",

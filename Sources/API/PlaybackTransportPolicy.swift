@@ -18,11 +18,16 @@ public enum PlaybackTransportVerdict: Equatable, Sendable {
 /// Reuses the same same-origin rule that guards the API requests.
 public enum PlaybackTransportPolicy {
     /// Relative or unparsable URIs are acceptable: they resolve against the
-    /// planned origin by construction.
+    /// planned origin by construction. Absolute URIs on non-web schemes
+    /// (file:, data:, …) or without a host can never be the planned origin —
+    /// they count as cross-origin, not as noise.
     public static func verdict(observedURI: String, plannedOrigin: URL) -> PlaybackTransportVerdict {
         guard let observed = URL(string: observedURI),
-              observed.scheme != nil, observed.host != nil else {
+              let scheme = observed.scheme?.lowercased() else {
             return .acceptable
+        }
+        guard scheme == "http" || scheme == "https", observed.host != nil else {
+            return .crossOrigin
         }
         if SameOriginRedirectPolicy.allowsRedirect(from: plannedOrigin, to: observed) {
             return .acceptable

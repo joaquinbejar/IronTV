@@ -58,6 +58,10 @@ final class PlayerViewModel: ObservableObject {
     /// Test seam: replaces the AVPlayer access-log read for the transport
     /// watch. nil in production (reads the real item's access log).
     var accessLogURIsProvider: (() -> [String])?
+    /// How many access-log entries the transport watch already judged, so a
+    /// long session stays O(new entries) per tick instead of O(log size).
+    /// Reset with every new item/session.
+    private var transportCheckedURICount = 0
 
     /// URIs the current item's media requests actually hit. The access log is
     /// per item, so a reconnect starts a fresh history.
@@ -75,7 +79,11 @@ final class PlayerViewModel: ObservableObject {
     /// UI. VLC has no access log; its gap is documented in the README.
     private func enforcePlaybackTransport() -> Bool {
         guard let currentURL else { return false }
-        guard PlaybackTransportPolicy.firstViolation(in: observedAccessURIs(), plannedOrigin: currentURL) != nil else {
+        let uris = observedAccessURIs()
+        guard uris.count > transportCheckedURICount else { return false }
+        let fresh = Array(uris[transportCheckedURICount...])
+        transportCheckedURICount = uris.count
+        guard PlaybackTransportPolicy.firstViolation(in: fresh, plannedOrigin: currentURL) != nil else {
             return false
         }
         stop()
@@ -261,6 +269,7 @@ final class PlayerViewModel: ObservableObject {
 
     func stop() {
         playbackGeneration &+= 1
+        transportCheckedURICount = 0
         cancelScheduledRetry()
         teardown.setTimer(nil)
         stopVLC()
@@ -285,6 +294,7 @@ final class PlayerViewModel: ObservableObject {
 
     private func startPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
         playbackGeneration &+= 1
+        transportCheckedURICount = 0
         settings = settingsStore.load()
         stopVLC()
         engine = .avPlayer
