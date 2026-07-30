@@ -173,7 +173,9 @@ final class PlayerViewModel: ObservableObject {
     /// look like AppleCoreMedia, which is exactly AVPlayer's default.
     /// `tsURL` is the raw MPEG-TS variant the VLC engine prefers (nil for
     /// demo/sample content).
-    func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil) {
+    /// `hlsAvailable: false` means the panel advertises no HLS for this
+    /// stream — skip the AVPlayer attempt and lead with the VLC engine.
+    func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil, hlsAvailable: Bool = true) {
         cancelScheduledRetry()
         reconnectAttempts = 0
         lastReconnectAt = nil
@@ -183,7 +185,7 @@ final class PlayerViewModel: ObservableObject {
         #if canImport(VLCKitSPM)
         // Forced-VLC preference, or a channel this session already learned
         // needs VLC — skip the AVPlayer attempt entirely.
-        let forceVLC = settings.preferredEngine == .vlc && !DemoMode.isActive
+        let forceVLC = (settings.preferredEngine == .vlc && !DemoMode.isActive) || !hlsAvailable
         if forceVLC || vlcOnlyStreams.contains(stream.id) {
             currentStream = stream
             currentURL = url

@@ -101,6 +101,18 @@ final class ChannelsViewModelTests: XCTestCase {
             }
         }
 
+        private var accountStatusResult = AccountStatus(
+            authenticated: true, status: "Active", expiryDate: nil, maxConnections: 1, allowedOutputFormats: nil
+        )
+
+        func setAccountStatus(_ status: AccountStatus) {
+            accountStatusResult = status
+        }
+
+        func accountStatus() async throws -> AccountStatus {
+            accountStatusResult
+        }
+
         func liveCategories() async throws -> [IronTV.Category] {
             script.categories
         }
@@ -295,6 +307,61 @@ final class ChannelsViewModelTests: XCTestCase {
         let fullListCalls = await browser.allStreamsCalls
         XCTAssertEqual(fullListCalls, 1, "All and Favorites must share one full-list request")
         XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(2)], "favorites filter over the shared list")
+    }
+
+    // MARK: - Playback plans
+
+    @MainActor
+    func testTSOnlyPanelPlansLeadWithVLC() async {
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.streamsByCategory = [1: [Self.stream(11)]] }
+        await browser.setAccountStatus(AccountStatus(
+            authenticated: true, status: "Active", expiryDate: nil, maxConnections: 1,
+            allowedOutputFormats: [.ts]
+        ))
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        let plan = try? viewModel.playbackPlan(for: StreamID(11))
+        XCTAssertEqual(plan?.hlsAvailable, false, "a TS-only panel must lead with the VLC engine")
+        XCTAssertEqual(plan?.primaryURL.pathExtension, "ts")
+    }
+
+    @MainActor
+    func testNothingPlayableSurfacesATypedError() async {
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.streamsByCategory = [1: [Self.stream(11)]] }
+        await browser.setAccountStatus(AccountStatus(
+            authenticated: true, status: "Active", expiryDate: nil, maxConnections: 1,
+            allowedOutputFormats: []
+        ))
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        XCTAssertThrowsError(try viewModel.playbackPlan(for: StreamID(11))) { error in
+            guard case PlaybackError.noPlayableSource = error else {
+                return XCTFail("expected noPlayableSource, got \(error)")
+            }
+        }
+    }
+
+    @MainActor
+    func testAbsentCapabilitiesKeepTodaysHLSPlusTSBehavior() async {
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.streamsByCategory = [1: [Self.stream(11)]] }
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        let plan = try? viewModel.playbackPlan(for: StreamID(11))
+        XCTAssertEqual(plan?.hlsAvailable, true)
+        XCTAssertEqual(plan?.primaryURL.pathExtension, "m3u8")
+        XCTAssertEqual(plan?.tsURL?.pathExtension, "ts")
     }
 
     // MARK: - Deallocation

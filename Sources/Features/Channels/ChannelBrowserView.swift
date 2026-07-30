@@ -37,11 +37,8 @@ struct ChannelBrowserView: View {
                 #if !os(tvOS)
                 guard let streamID, let stream = channels.selectedStream() else { return }
                 do {
-                    player.play(
-                        stream,
-                        url: try channels.playbackURL(for: streamID),
-                        tsURL: channels.playbackTSURL(for: streamID)
-                    )
+                    let plan = try channels.playbackPlan(for: streamID)
+                    player.play(stream, url: plan.primaryURL, tsURL: plan.tsURL, hlsAvailable: plan.hlsAvailable)
                 } catch {
                     player.fail(error)
                 }

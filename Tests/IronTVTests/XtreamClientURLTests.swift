@@ -90,6 +90,15 @@ final class XtreamClientURLTests: XCTestCase {
         XCTAssertEqual(redacted, "http://host.example.com:8080/live/REDACTED/REDACTED/1001.m3u8")
     }
 
+    func testRedactsTokenBearingDirectSourceURLs() {
+        let url = URL(string: "http://host.example.com/direct/stream.m3u8?token=sekret123&channel=7")!
+        let redacted = CredentialRedactor.redact(url)
+
+        XCTAssertFalse(redacted.contains("sekret123"), "direct_source tokens must never reach a log")
+        XCTAssertTrue(redacted.contains("token=REDACTED"))
+        XCTAssertTrue(redacted.contains("channel=7"), "non-credential params must survive")
+    }
+
     func testRedactionLeavesCredentialFreeURLsAlone() {
         let url = URL(string: "http://cdn.example.com/logos/news1.png")!
         XCTAssertEqual(CredentialRedactor.redact(url), url.absoluteString)
