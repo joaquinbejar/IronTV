@@ -212,7 +212,9 @@ final class ChannelsViewModel: ObservableObject {
         }
         categoriesPhase = .loading
         let client = self.client
-        return Task { try await client.liveCategories() }
+        // Detached: the wrapper frames must not be scheduled on the main actor
+        // (the client's nonisolated async work already runs off it).
+        return Task.detached { try await client.liveCategories() }
     }
 
     private func finishCategoriesLoad(_ result: Result<[Category], Error>) {
@@ -294,11 +296,11 @@ final class ChannelsViewModel: ObservableObject {
             if !bypassCache, let inFlight = allStreamsTask, !inFlight.isCancelled {
                 return .fetch(selection, inFlight, exclusive: false)
             }
-            let task = Task { try await client.liveStreams(in: nil) }
+            let task = Task.detached { try await client.liveStreams(in: nil) }
             allStreamsTask = task
             return .fetch(selection, task, exclusive: false)
         case .category(let categoryID):
-            return .fetch(selection, Task { try await client.liveStreams(in: categoryID) }, exclusive: true)
+            return .fetch(selection, Task.detached { try await client.liveStreams(in: categoryID) }, exclusive: true)
         }
     }
 
@@ -309,6 +311,9 @@ final class ChannelsViewModel: ObservableObject {
             // is current — the next All/Favorites visit serves from it.
             if selection == .all || selection == .favorites {
                 streamCache[.all] = fetched
+                // The cache is the source of truth now — dropping the completed
+                // task releases its retained copy of the catalog.
+                allStreamsTask = nil
             }
             // Only the current selection may update phases, the visible list,
             // or the per-category cache — stale responses are dropped.
