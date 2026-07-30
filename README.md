@@ -74,10 +74,27 @@ Adding any other dependency needs explicit approval first.
 scripts/make-dmg.sh
 ```
 
-Builds a universal (arm64 + x86_64) Release, signs it with Developer ID, packages `dist/IronTV-<version>.dmg`, notarizes it with Apple, and staples the ticket. Requires a `Developer ID Application` certificate and a stored notary profile:
+Regenerates the Xcode project from `project.yml`, builds a universal
+(arm64 + x86_64) Release archive into a fresh temporary derived-data
+directory, and packages exactly that build as `dist/IronTV-<version>.dmg` —
+the script fails rather than package anything whose version, architectures,
+embedded frameworks, entitlements, or signature don't match the requested
+configuration.
+
+When a `Developer ID Application` certificate is present, the archive is
+exported with Developer ID signing, notarized, stapled, and
+Gatekeeper-verified. This needs Xcode signed in to the team's Apple Developer
+account (Xcode → Settings → Accounts) and a stored notary profile:
 
 ```bash
-xcrun notarytool store-credentials irontv-notary --apple-id <apple-id> --team-id <team-id>
+xcrun notarytool store-credentials irontv-notary --apple-id <apple-id> --team-id 5NP3LPSUMR
+```
+
+For a local, un-notarized build (installs with a quarantine workaround
+documented inside the DMG):
+
+```bash
+IRONTV_NOTARIZE=0 scripts/make-dmg.sh
 ```
 
 ## Architecture
