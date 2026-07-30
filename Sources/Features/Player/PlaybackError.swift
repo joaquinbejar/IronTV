@@ -6,6 +6,10 @@ public enum PlaybackError: Error, LocalizedError {
     /// The panel advertises no container format this device can play and no
     /// trusted direct source for the stream.
     case noPlayableSource
+    /// The stream's media requests moved to an insecure or different server
+    /// than the planned origin — playback is stopped rather than keep sending
+    /// credential-bearing requests there.
+    case insecureTransport
 
     public var errorDescription: String? {
         switch self {
@@ -15,6 +19,8 @@ public enum PlaybackError: Error, LocalizedError {
             return message
         case .noPlayableSource:
             return "This channel advertises no format this device can play."
+        case .insecureTransport:
+            return "Playback was stopped: the stream tried to move to an insecure or different server."
         }
     }
 }

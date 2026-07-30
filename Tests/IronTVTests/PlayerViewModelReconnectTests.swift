@@ -212,6 +212,37 @@ final class PlayerViewModelReconnectTests: XCTestCase {
         XCTAssertEqual(viewModel.currentTSURL, tsURL)
     }
 
+    // MARK: - Transport watch
+
+    @MainActor
+    func testTransportViolationStopsPlaybackWithATypedError() async {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, attempts) = makePrimed(recorder: recorder, clock: clock)
+        viewModel.primeForReconnectTesting(stream: stream, url: hlsURL, tsURL: tsURL, settings: testSettings, state: .playing)
+        viewModel.accessLogURIsProvider = { ["http://evil.example.net/segments/1.ts"] }
+
+        viewModel.watchdogTick()
+
+        XCTAssertEqual(viewModel.state, .failed(PlaybackError.insecureTransport.errorDescription ?? ""))
+        XCTAssertNil(viewModel.currentURL, "the session must be torn down, not just flagged")
+        XCTAssertTrue(attempts().isEmpty, "a transport violation must not trigger a reconnect")
+    }
+
+    @MainActor
+    func testSameOriginAccessLogEntriesDoNotStopPlayback() async {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, _) = makePrimed(recorder: recorder, clock: clock)
+        viewModel.primeForReconnectTesting(stream: stream, url: hlsURL, tsURL: tsURL, settings: testSettings, state: .playing)
+        viewModel.accessLogURIsProvider = { ["segments/1.ts", "http://host.example.com/live/u/p/2.ts"] }
+
+        viewModel.watchdogTick()
+
+        XCTAssertNotEqual(viewModel.state, .failed(PlaybackError.insecureTransport.errorDescription ?? ""))
+        XCTAssertEqual(viewModel.currentURL, hlsURL)
+    }
+
     // MARK: - Stale VLC callbacks
 
     #if canImport(VLCKitSPM)
