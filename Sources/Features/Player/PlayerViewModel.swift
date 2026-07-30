@@ -45,9 +45,49 @@ final class PlayerViewModel: ObservableObject {
     private var settings = PlaybackSettings.default
     private let settingsStore: PlaybackSettingsStore
 
-    init(settingsStore: PlaybackSettingsStore = PlaybackSettingsStore()) {
+    /// Monotonic token identifying the current playback session. Every async
+    /// continuation — KVO hops, VLC delegate hops, scheduled retries — captures
+    /// it and bails when superseded, so work belonging to a replaced player or
+    /// an earlier attempt can never touch fresh state.
+    private(set) var playbackGeneration: UInt64 = 0
+
+    /// Test seam: replaces the engine start during reconnect so backoff tests
+    /// run deterministically without spinning real players. nil in production.
+    var reconnectStartOverride: ((LiveStream, URL) -> Void)?
+
+    /// Test seam: primes a session without starting a real engine, so the
+    /// reconnect/backoff machinery is observable deterministically.
+    func primeForReconnectTesting(stream: LiveStream, url: URL, tsURL: URL?, settings: PlaybackSettings) {
+        currentStream = stream
+        currentURL = url
+        currentTSURL = tsURL
+        self.settings = settings
+    }
+
+    /// One pending scheduled reconnect at most; cancelled on stop, on a new
+    /// play, and on deinit. Replaces the old reliance on the watchdog to
+    /// re-drive backoff — the watchdog is disabled during VLC sessions.
+    private var reconnectRetryTask: Task<Void, Never>?
+
+    /// Injected sleep for the scheduled retry, so backoff is deterministic in
+    /// tests. Production sleeps for real.
+    private let retrySleep: @Sendable (TimeInterval) async throws -> Void
+    /// Injected wall clock for the backoff window math, same reason.
+    private let now: () -> Date
+
+    init(
+        settingsStore: PlaybackSettingsStore = PlaybackSettingsStore(),
+        retrySleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) },
+        now: @escaping () -> Date = Date.init
+    ) {
         self.settingsStore = settingsStore
+        self.retrySleep = retrySleep
+        self.now = now
         configureTimeControlObservation()
+    }
+
+    deinit {
+        reconnectRetryTask?.cancel()
     }
 
     /// Swap in a fresh AVPlayer and dispose of the old one off the main
@@ -73,7 +113,7 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var currentStream: LiveStream?
 
-    private var currentURL: URL?
+    private(set) var currentURL: URL?
     private var statusObservation: NSKeyValueObservation?
     private var timeControlObservation: NSKeyValueObservation?
     private var keepUpObservation: NSKeyValueObservation?
@@ -84,10 +124,10 @@ final class PlayerViewModel: ObservableObject {
     private var lastObservedTime: CMTime = .zero
     private var frozenSeconds: TimeInterval = 0
     private var waitingSince: Date?
-    private var reconnectAttempts = 0
+    private(set) var reconnectAttempts = 0
     private var lastReconnectAt: Date?
     /// Raw MPEG-TS variant of the current stream, for the VLC engine.
-    private var currentTSURL: URL?
+    private(set) var currentTSURL: URL?
     /// Timestamps of recent AVPlayer stall recoveries. A channel needing
     /// several within a short window plays badly over the panel's HLS — the
     /// cure is the raw TS stream through VLC, which is what other IPTV
@@ -101,10 +141,12 @@ final class PlayerViewModel: ObservableObject {
     private var attemptedSeekRecovery = false
 
     private func configureTimeControlObservation() {
+        let generation = playbackGeneration
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
             let status = player.timeControlStatus
             Task { @MainActor [weak self] in
-                guard let self, self.currentStream != nil else { return }
+                guard let self, self.currentStream != nil,
+                      self.playbackGeneration == generation else { return }
                 switch status {
                 case .playing:
                     self.state = .playing
@@ -131,6 +173,7 @@ final class PlayerViewModel: ObservableObject {
     /// `tsURL` is the raw MPEG-TS variant the VLC engine prefers (nil for
     /// demo/sample content).
     func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil) {
+        cancelScheduledRetry()
         reconnectAttempts = 0
         lastReconnectAt = nil
         stallRecoveryEvents = []
@@ -181,6 +224,8 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func stop() {
+        playbackGeneration &+= 1
+        cancelScheduledRetry()
         teardown.setTimer(nil)
         stopVLC()
         engine = .avPlayer
@@ -189,12 +234,20 @@ final class PlayerViewModel: ObservableObject {
         currentURL = nil
         currentTSURL = nil
         stallRecoveryEvents = []
+        // A later retry()/play() must start from a clean recovery history —
+        // stale attempt counts would inherit the previous stream's backoff.
+        reconnectAttempts = 0
+        lastReconnectAt = nil
+        waitingSince = nil
+        frozenSeconds = 0
+        attemptedSeekRecovery = false
         state = .idle
     }
 
     // MARK: - Playback plumbing
 
     private func startPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
+        playbackGeneration &+= 1
         settings = settingsStore.load()
         stopVLC()
         engine = .avPlayer
@@ -443,22 +496,31 @@ final class PlayerViewModel: ObservableObject {
     /// fresh playback token on every connection. Live streams never give up:
     /// after a burst of fast retries it backs off but keeps trying silently,
     /// so a temporarily-dropped channel resumes on its own with no prompt.
-    private func reconnect() {
+    func reconnect() {
         guard let currentStream, let currentURL else { return }
-        reconnectAttempts += 1
 
-        // Immediate for the first few attempts, then a capped backoff. The
-        // watchdog keeps calling us; we no-op (staying in .reconnecting) until
-        // enough time has passed for the next attempt.
-        let backoff: TimeInterval = reconnectAttempts <= settings.maxReconnectAttempts
+        // Immediate for the first few attempts, then a capped backoff. Only
+        // *executed* attempts count — a suppressed call schedules its own
+        // cancellable retry instead of inflating the counter at whatever
+        // cadence the caller happens to have (the VLC engine has no watchdog
+        // at all, so nothing else would re-drive the backoff).
+        let nextAttempt = reconnectAttempts + 1
+        let backoff: TimeInterval = nextAttempt <= settings.maxReconnectAttempts
             ? 0
-            : min(Double(reconnectAttempts - settings.maxReconnectAttempts) * 3, 15)
-        let now = Date()
-        if backoff > 0, let last = lastReconnectAt, now.timeIntervalSince(last) < backoff {
+            : min(Double(nextAttempt - settings.maxReconnectAttempts) * 3, 15)
+        let currentTime = now()
+        if backoff > 0, let last = lastReconnectAt, currentTime.timeIntervalSince(last) < backoff {
             state = .reconnecting
+            scheduleRetry(after: backoff - currentTime.timeIntervalSince(last))
             return
         }
-        lastReconnectAt = now
+        reconnectAttempts = nextAttempt
+        lastReconnectAt = currentTime
+        if let reconnectStartOverride {
+            playbackGeneration &+= 1
+            reconnectStartOverride(currentStream, currentURL)
+            return
+        }
 
         #if canImport(VLCKitSPM)
         if engine == .vlc {
@@ -467,6 +529,27 @@ final class PlayerViewModel: ObservableObject {
         }
         #endif
         startPlayback(currentStream, url: currentURL, as: .reconnecting)
+    }
+
+    /// One pending retry at most: fires after `delay`, re-enters `reconnect()`
+    /// only if this playback session is still current. Weakly held across the
+    /// sleep, so a pending retry never pins the view model.
+    private func scheduleRetry(after delay: TimeInterval) {
+        guard reconnectRetryTask == nil else { return }
+        let generation = playbackGeneration
+        reconnectRetryTask = Task { [weak self] in
+            guard let sleep = self?.retrySleep else { return }
+            try? await sleep(delay)
+            guard let self else { return }
+            self.reconnectRetryTask = nil
+            guard !Task.isCancelled, self.playbackGeneration == generation else { return }
+            self.reconnect()
+        }
+    }
+
+    private func cancelScheduledRetry() {
+        reconnectRetryTask?.cancel()
+        reconnectRetryTask = nil
     }
 
     /// AVPlayer item failed: codec problems fall back to the VLC engine
@@ -531,6 +614,7 @@ final class PlayerViewModel: ObservableObject {
 
     #if canImport(VLCKitSPM)
     private func startVLCPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
+        playbackGeneration &+= 1
         settings = settingsStore.load()
         teardown.setTimer(nil)
         stopVLC()
@@ -538,7 +622,9 @@ final class PlayerViewModel: ObservableObject {
 
         engine = .vlc
         currentStream = stream
-        currentURL = url
+        // Deliberately NOT overwriting currentURL: it keeps the original HLS
+        // identity so retry() and an AVPlayer reconnect recover the right
+        // stream — `url` here is usually the raw TS variant.
         state = initialState
 
         let media = VLCMedia(url: url)
@@ -556,7 +642,20 @@ final class PlayerViewModel: ObservableObject {
         player.play()
     }
 
-    fileprivate func vlcStateChanged(_ vlcState: VLCMediaPlayerState) {
+    /// True while a session is actually running — the only states from which
+    /// engine events may drive recovery.
+    private var isInActivePlayback: Bool {
+        switch state {
+        case .loading, .playing, .buffering, .reconnecting: return true
+        case .idle, .failed: return false
+        }
+    }
+
+    func vlcStateChanged(_ vlcState: VLCMediaPlayerState, fromPlayerID playerID: ObjectIdentifier) {
+        // Identity first: a replaced player's late events must never drive
+        // the current session (the AVPlayer path guards with
+        // `player.currentItem === item`; this is the VLC equivalent).
+        guard let vlcPlayer, ObjectIdentifier(vlcPlayer) == playerID else { return }
         guard engine == .vlc else { return }
         switch vlcState {
         case .opening, .buffering:
@@ -569,10 +668,13 @@ final class PlayerViewModel: ObservableObject {
         case .paused:
             break // user pause via future controls; don't fight it
         case .error:
+            guard isInActivePlayback else { return }
             reconnectOrFail("This channel could not be played (VLC engine).")
         case .stopped, .ended:
-            // Live streams shouldn't end — treat as a dropped connection.
-            if state == .playing || state == .buffering {
+            // Live streams shouldn't end — treat as a dropped connection from
+            // ANY active state: a stream that stops while still opening or
+            // reconnecting was previously left stuck forever.
+            if isInActivePlayback {
                 reconnect()
             }
         @unknown default:
@@ -589,11 +691,13 @@ final class PlayerViewModel: ObservableObject {
     }
 
     /// VLC's playback clock advanced — frames are flowing.
-    fileprivate func vlcTimeAdvanced() {
+    func vlcTimeAdvanced(fromPlayerID playerID: ObjectIdentifier) {
+        guard let vlcPlayer, ObjectIdentifier(vlcPlayer) == playerID else { return }
         guard engine == .vlc, state != .playing else { return }
         if case .failed = state { return }
         state = .playing
         reconnectAttempts = 0
+        lastReconnectAt = nil
     }
     #endif
 }
@@ -606,14 +710,20 @@ private final class VLCDelegateProxy: NSObject, VLCMediaPlayerDelegate {
     func mediaPlayerStateChanged(_ aNotification: Notification) {
         guard let player = aNotification.object as? VLCMediaPlayer else { return }
         let state = player.state
+        // ObjectIdentifier travels instead of the (non-Sendable) player: the
+        // owner compares it against its current instance, so a dying player's
+        // events can't cross into the replacement's session.
+        let playerID = ObjectIdentifier(player)
         Task { @MainActor [weak owner] in
-            owner?.vlcStateChanged(state)
+            owner?.vlcStateChanged(state, fromPlayerID: playerID)
         }
     }
 
     func mediaPlayerTimeChanged(_ aNotification: Notification) {
+        guard let player = aNotification.object as? VLCMediaPlayer else { return }
+        let playerID = ObjectIdentifier(player)
         Task { @MainActor [weak owner] in
-            owner?.vlcTimeAdvanced()
+            owner?.vlcTimeAdvanced(fromPlayerID: playerID)
         }
     }
 }
