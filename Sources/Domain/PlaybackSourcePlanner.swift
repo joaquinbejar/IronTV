@@ -50,14 +50,27 @@ public enum PlaybackSourcePlanner {
         )
     }
 
+    /// Same-origin trust, aligned with the API-side rule: http/https scheme,
+    /// same host, same effective port — a direct_source hopping ports could
+    /// route credential/token-bearing URLs to a different service on the same
+    /// machine. A scheme upgrade (http panel → https direct) is allowed; a
+    /// downgrade (https panel → http direct) is not.
     private static func trustedDirectURL(_ url: URL?, panelHost: URL) -> URL? {
         guard let url,
               let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
               let host = url.host?.lowercased(),
+              let panelScheme = panelHost.scheme?.lowercased(),
               let trusted = panelHost.host?.lowercased(),
-              host == trusted else {
+              host == trusted,
+              effectivePort(scheme: scheme, port: url.port) == effectivePort(scheme: panelScheme, port: panelHost.port),
+              !(panelScheme == "https" && scheme == "http") else {
             return nil
         }
         return url
+    }
+
+    private static func effectivePort(scheme: String, port: Int?) -> Int {
+        if let port { return port }
+        return scheme == "https" ? 443 : 80
     }
 }
