@@ -33,14 +33,33 @@ final class FavoritesStoreTests: XCTestCase {
         XCTAssertTrue(store.load().isEmpty)
     }
 
-    /// Favorites are already synced to iCloud under this exact key. Rebuilding it
-    /// from `AccountIdentity` must not change the string, or shipped users lose
-    /// their favorites on update.
-    func testStorageKeyMatchesTheKeyShippedBeforeAccountIdentity() {
+    /// Favorites shipped (and synced to iCloud) under the plaintext
+    /// `host.username` key. That value must keep loading — now via migration
+    /// to the digest key, which also scrubs the account metadata from the
+    /// key name.
+    func testValuesUnderTheShippedPlaintextKeyMigrateToTheDigestKey() {
+        let shippedKey = "favorites.http://host.example.com:8080.user1"
+        defaults.set([1001], forKey: shippedKey)
+
         let store = FavoritesStore(account: account, storage: defaults)
 
-        XCTAssertEqual(store.storageKey, "favorites.http://host.example.com:8080.user1")
+        XCTAssertEqual(store.load(), [StreamID(1001)], "shipped favorites must survive the key migration")
+        XCTAssertNil(defaults.object(forKey: shippedKey), "the plaintext key must be gone after migration")
+        XCTAssertTrue(store.storageKey.hasPrefix("favorites.v1."))
+        XCTAssertFalse(store.storageKey.contains("host.example.com"))
+        XCTAssertFalse(store.storageKey.contains("user1"))
         XCTAssertFalse(store.storageKey.contains(account.password))
+    }
+
+    func testMigrationNeverClobbersAValueAlreadyUnderTheDigestKey() {
+        let store = FavoritesStore(account: account, storage: defaults)
+        store.save([StreamID(42)])
+        defaults.set([1001], forKey: "favorites.http://host.example.com:8080.user1")
+
+        let rebuilt = FavoritesStore(account: account, storage: defaults)
+
+        XCTAssertEqual(rebuilt.load(), [StreamID(42)], "an existing digest-key value must win over a reappearing legacy key")
+        XCTAssertNil(defaults.object(forKey: "favorites.http://host.example.com:8080.user1"))
     }
 
     /// A password rotation is the same account — favorites must survive it.

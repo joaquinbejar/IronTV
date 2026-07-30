@@ -1,4 +1,19 @@
 import Foundation
+import os
+
+/// The NSUbiquitousKeyValueStore surface `SyncedStorage` uses, as a seam so
+/// sync behavior — conflicts, change reasons, write batching — is
+/// unit-testable without a provisioned iCloud container.
+public protocol CloudKeyValueStore: AnyObject {
+    var dictionaryRepresentation: [String: Any] { get }
+    func object(forKey aKey: String) -> Any?
+    func set(_ anObject: Any?, forKey aKey: String)
+    func removeObject(forKey aKey: String)
+    @discardableResult
+    func synchronize() -> Bool
+}
+
+extension NSUbiquitousKeyValueStore: CloudKeyValueStore {}
 
 /// Minimal key-value surface the preference stores need. UserDefaults
 /// satisfies it directly; SyncedStorage adds iCloud mirroring on top.
@@ -38,15 +53,19 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     /// nil until the iCloud KVS entitlement is provisioned — touching
     /// NSUbiquitousKeyValueStore without it logs "BUG IN CLIENT OF KVS"
     /// on every launch. Gated by the `IronTVCloudKVSEnabled` Info.plist flag.
-    private let cloud: NSUbiquitousKeyValueStore?
+    private let cloud: CloudKeyValueStore?
     private let teardown = TeardownBag()
+
+    /// Sync diagnostics: change reasons and key counts only — never values,
+    /// which can be account-scoped preference data.
+    private static let logger = Logger(subsystem: "com.taunais.irontv", category: "kvs")
 
     public convenience init(defaults: UserDefaults = .standard) {
         let enabled = Bundle.main.object(forInfoDictionaryKey: "IronTVCloudKVSEnabled") as? Bool ?? false
-        self.init(defaults: defaults, cloud: enabled ? .default : nil)
+        self.init(defaults: defaults, cloud: enabled ? NSUbiquitousKeyValueStore.default : nil)
     }
 
-    public init(defaults: UserDefaults, cloud: NSUbiquitousKeyValueStore?) {
+    public init(defaults: UserDefaults, cloud: CloudKeyValueStore?) {
         self.defaults = defaults
         self.cloud = cloud
 
@@ -60,7 +79,9 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
             self?.applyExternalChanges(notification)
         })
 
-        // Adopt whatever iCloud already has at startup (remote wins).
+        // The one deliberate synchronize(): ask for the freshest server state
+        // at startup, then adopt it (remote wins). Individual writes below
+        // never force a sync — the system schedules uploads itself.
         cloud.synchronize()
         for (key, value) in cloud.dictionaryRepresentation {
             defaults.set(value, forKey: key)
@@ -81,14 +102,15 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
 
     public func set(_ value: Any?, forKey defaultName: String) {
         defaults.set(value, forKey: defaultName)
+        // No synchronize(): forcing one per field turned a settings save
+        // (nine keys) into a burst of sync requests. The documented KVS
+        // lifecycle batches and uploads on its own schedule.
         cloud?.set(value, forKey: defaultName)
-        cloud?.synchronize()
     }
 
     public func removeObject(forKey defaultName: String) {
         defaults.removeObject(forKey: defaultName)
         cloud?.removeObject(forKey: defaultName)
-        cloud?.synchronize()
     }
 
     /// First launch after sync is enabled: iCloud holds nothing for a key this
@@ -99,13 +121,34 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     private func seedCloudIfEmpty(_ key: String, local: Any?) {
         guard let cloud, let local, cloud.object(forKey: key) == nil else { return }
         cloud.set(local, forKey: key)
-        cloud.synchronize()
     }
 
+    /// Conflict semantics, applied here for every synced value: per-key
+    /// last-writer-wins, remote wins on arrival. Favorites are one key, so a
+    /// remote list replaces ours wholesale (that's what makes removals
+    /// propagate); playback settings are per-field keys, so devices can merge
+    /// field-wise; last-channel state is per-key per account.
     private func applyExternalChanges(_ notification: Notification) {
         guard let cloud else { return }
+
+        let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+        switch reason {
+        case NSUbiquitousKeyValueStoreQuotaViolationChange:
+            // Nothing remote to adopt — our own writes were refused. The
+            // system retries; local UserDefaults stays authoritative.
+            Self.logger.warning("iCloud KVS quota violation — writes deferred by the system; local values remain authoritative.")
+            return
+        case NSUbiquitousKeyValueStoreAccountChange:
+            Self.logger.notice("iCloud account changed — adopting the new account's key-value state.")
+        case NSUbiquitousKeyValueStoreServerChange, NSUbiquitousKeyValueStoreInitialSyncChange:
+            break
+        default:
+            break
+        }
+
         let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
         guard !changedKeys.isEmpty else { return }
+        Self.logger.debug("Adopting \(changedKeys.count, privacy: .public) remote key(s), reason \(reason.map(String.init) ?? "unknown", privacy: .public).")
 
         for key in changedKeys {
             if let value = cloud.object(forKey: key) {

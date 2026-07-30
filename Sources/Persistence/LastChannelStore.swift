@@ -22,8 +22,13 @@ public struct LastChannelStore {
 
     public init(identity: AccountIdentity, storage: KeyValueStorage = SyncedStorage.shared) {
         self.storage = storage
-        self.categoryKey = "\(Self.legacyCategoryKey).\(identity.namespace)"
-        self.streamKey = "\(Self.legacyStreamKey).\(identity.namespace)"
+        self.categoryKey = "\(Self.legacyCategoryKey).\(identity.storageNamespace)"
+        self.streamKey = "\(Self.legacyStreamKey).\(identity.storageNamespace)"
+        // Plaintext-namespace keys (host.username) shipped between the
+        // account-scoping release and the digest namespace: rename first, so
+        // the unscoped adoption below can't overwrite a migrated value.
+        PreferenceKeyMigration.migrate("\(Self.legacyCategoryKey).\(identity.namespace)", to: categoryKey, in: storage)
+        PreferenceKeyMigration.migrate("\(Self.legacyStreamKey).\(identity.namespace)", to: streamKey, in: storage)
         adoptLegacyValuesIfNeeded()
     }
 
