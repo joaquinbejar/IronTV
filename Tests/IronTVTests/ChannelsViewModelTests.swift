@@ -407,6 +407,31 @@ final class ChannelsViewModelTests: XCTestCase {
         XCTAssertEqual(plan?.primaryURL.pathExtension, "ts")
     }
 
+    /// The background/foreground re-arm path: clearing the selection and
+    /// tapping the same row again must be a real change that re-enters the
+    /// playback path (and keeps the last-channel memory).
+    @MainActor
+    func testClearingAndReselectingTheSameStreamReFires() async {
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.streamsByCategory = [1: [Self.stream(11)]] }
+        let lastChannel = LastChannelStore(identity: account.identity, storage: defaults)
+        let viewModel = ChannelsViewModel(
+            account: account, lastChannel: lastChannel, client: browser, preferenceStorage: defaults
+        )
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        viewModel.selectedStreamID = StreamID(11)
+        XCTAssertEqual(lastChannel.lastStreamID, StreamID(11))
+
+        viewModel.selectedStreamID = nil // background re-arm
+        viewModel.selectedStreamID = StreamID(11) // one-tap replay
+
+        XCTAssertEqual(viewModel.selectedStreamID, StreamID(11))
+        XCTAssertEqual(lastChannel.lastStreamID, StreamID(11), "the last-channel memory survives the re-arm")
+    }
+
     // MARK: - Deallocation
 
     @MainActor

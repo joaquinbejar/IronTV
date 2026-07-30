@@ -66,6 +66,11 @@ struct ChannelBrowserView: View {
                 // selection is retained, replay is one tap (documented).
                 if phase == .background {
                     player.stop()
+                    // Re-arm the one-tap replay: with the selection cleared,
+                    // tapping the same row is a real change and re-enters the
+                    // playback path. The last-channel store already remembers
+                    // the stream, so nothing is lost.
+                    channels.selectedStreamID = nil
                 }
             }
             #endif
@@ -467,26 +472,43 @@ private struct TVChannelListScreen: View {
 private struct TVPlayerScreen: View {
     @ObservedObject var channels: ChannelsViewModel
     @ObservedObject var player: PlayerViewModel
+    @Environment(\.scenePhase) private var scenePhase
     let stream: LiveStream
 
     var body: some View {
         PlayerView(viewModel: player, hidesChrome: true)
             .ignoresSafeArea()
+            .onChange(of: scenePhase) { _, phase in
+                // Standing on the player screen IS the explicit intent to
+                // watch this channel: foregrounding resumes it (backgrounding
+                // stopped it and released the provider slot). Leaving the
+                // screen stops playback like before — this is per-screen
+                // resume, not the global auto-play the policy rejects.
+                guard phase == .active, player.currentStream == nil else { return }
+                startPlayback()
+            }
             .onAppear {
                 channels.selectedStreamID = stream.id // remembers last channel
-                do {
-                    player.play(
-                        stream,
-                        url: try channels.playbackURL(for: stream.id),
-                        tsURL: channels.playbackTSURL(for: stream.id)
-                    )
-                } catch {
-                    player.fail(error)
-                }
+                startPlayback()
             }
             .onDisappear {
                 player.stop()
             }
+    }
+
+    /// The capabilities-aware playback path — the same plan the other
+    /// platforms use (TS-only panels lead with VLC, trusted direct sources).
+    private func startPlayback() {
+        Task {
+            do {
+                let plan = try await channels.playbackPlan(for: stream.id)
+                guard channels.selectedStreamID == stream.id else { return }
+                player.play(stream, url: plan.primaryURL, tsURL: plan.tsURL, hlsAvailable: plan.hlsAvailable)
+            } catch {
+                guard channels.selectedStreamID == stream.id else { return }
+                player.fail(error)
+            }
+        }
     }
 }
 #endif
