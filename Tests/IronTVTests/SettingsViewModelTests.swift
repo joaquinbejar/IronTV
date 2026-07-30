@@ -279,6 +279,25 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.phase, .idle)
     }
 
+    /// A failed removal is no reason to leave a pasted password on screen.
+    func testAFailedRemovalStillClearsTheCredentialField() async {
+        let store = FakeAccountStore()
+        store.deleteError = KeychainError.unexpectedStatus(-25300)
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+        let appModel = AppModel(store: store)
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        viewModel.urlText = validURL
+
+        viewModel.removeAccount(from: appModel)
+
+        XCTAssertEqual(viewModel.urlText, "")
+        guard case .failure = viewModel.phase else {
+            return XCTFail("expected the removal failure to be reported, got \(viewModel.phase)")
+        }
+    }
+
     func testCanSubmitRequiresNonEmptyTextAndNoRequestInFlight() async {
         let gate = Gate()
         let (viewModel, _) = makeViewModel(result: .success(authenticated()), gate: gate)

@@ -83,9 +83,11 @@ final class SettingsViewModel: ObservableObject {
 
     func removeAccount(from appModel: AppModel) {
         cancelValidation()
+        // Cleared before the attempt, not after: a failed removal is no reason to
+        // leave a pasted password on screen.
+        urlText = ""
         do {
             try appModel.removeAccount()
-            urlText = ""
             phase = .idle
         } catch {
             phase = .failure(errorMessage(for: error))
