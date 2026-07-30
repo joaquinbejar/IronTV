@@ -54,6 +54,10 @@ struct ChannelBrowserView: View {
                 player.stop()
             }
             #if os(macOS)
+            // Hand the floating player this window explicitly, so entering
+            // mini-player mode hides and restores the browser rather than
+            // whichever main-capable window AppKit happens to list first.
+            .background(HostWindowReader { floatingManager.recordSourceWindow($0) })
             // Track macOS full screen regardless of how it was triggered
             // (our button, green button, or Ctrl+Cmd+F).
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in

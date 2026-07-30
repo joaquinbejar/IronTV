@@ -3,36 +3,65 @@ import AppKit
 import SwiftUI
 
 /// Floating mini-player: a chromeless, resizable, always-on-top window with
-/// nothing but the video. The main window hides while it's active and comes
-/// back when the user exits (button or double-click).
+/// nothing but the video. The source window hides while it's active and comes
+/// back when the user exits.
+///
+/// Every way out converges on ``cleanUp(restoringSource:)``, which is
+/// idempotent: the exit button, a double-click, Cmd-W or `performClose(_:)`
+/// (through `windowWillClose`), the source window closing, and app termination.
+/// Hiding the close button does not stop Cmd-W, so without that convergence the
+/// app could be left with its main window ordered out, `isFloating` still true,
+/// and no reachable window or recovery control.
 @MainActor
-final class FloatingPlayerManager: ObservableObject {
+final class FloatingPlayerManager: NSObject, ObservableObject {
     @Published private(set) var isFloating = false
 
     private var window: NSWindow?
-    private weak var hiddenMainWindow: NSWindow?
+    /// The window the user entered from — the one to hide and restore. Recorded
+    /// explicitly via ``recordSourceWindow(_:)`` instead of picked out of
+    /// `NSApp.windows`, where Settings is main-capable too.
+    private weak var sourceWindow: NSWindow?
+    /// The view model the floating window was entered with, so close paths that
+    /// carry no argument (Cmd-W, termination) can still rebuild the VLC surface.
+    private weak var activeViewModel: PlayerViewModel?
+    private var observers: [NSObjectProtocol] = []
     private static let frameAutosaveName = "IronTVFloatingPlayer"
+
+    // No deinit: observers exist only while floating and are torn down by
+    // `stopObserving()` on every exit path. Removing them from a nonisolated
+    // deinit would touch non-Sendable tokens off the actor — a strict-concurrency
+    // warning that becomes an error under Swift 6 (see issue #17). Each block
+    // captures `self` weakly, so a token that ever did outlive the manager would
+    // fire into nothing.
+
+    /// Called by the browser as its window becomes known, so entering floating
+    /// mode never has to guess which window to hide.
+    func recordSourceWindow(_ window: NSWindow?) {
+        guard let window else { return }
+        sourceWindow = window
+    }
 
     func toggle(with viewModel: PlayerViewModel) {
         if isFloating {
-            exit(viewModel: viewModel)
+            cleanUp(restoringSource: true)
         } else {
             enter(viewModel: viewModel)
         }
     }
 
-    func exitIfNeeded(viewModel: PlayerViewModel) {
+    /// The view model is tracked from ``enter(viewModel:)``, so the parameter is
+    /// kept for the call site only.
+    func exitIfNeeded(viewModel _: PlayerViewModel) {
         if isFloating {
-            exit(viewModel: viewModel)
+            cleanUp(restoringSource: true)
         }
     }
 
     private func enter(viewModel: PlayerViewModel) {
         guard window == nil else { return }
 
-        let content = FloatingPlayerContent(viewModel: viewModel) { [weak self, weak viewModel] in
-            guard let self, let viewModel else { return }
-            self.exit(viewModel: viewModel)
+        let content = FloatingPlayerContent(viewModel: viewModel) { [weak self] in
+            self?.cleanUp(restoringSource: true)
         }
         let hosting = NSHostingController(rootView: content)
         let floating = NSWindow(contentViewController: hosting)
@@ -52,6 +81,9 @@ final class FloatingPlayerManager: ObservableObject {
         floating.contentAspectRatio = NSSize(width: 16, height: 9)
         floating.minSize = NSSize(width: 320, height: 180)
         floating.isReleasedWhenClosed = false
+        // Cmd-W and performClose(_:) close the window even with the close button
+        // hidden; the delegate is what turns that into a full exit.
+        floating.delegate = self
 
         if !floating.setFrameUsingName(Self.frameAutosaveName), let screen = NSScreen.main {
             let area = screen.visibleFrame
@@ -62,12 +94,15 @@ final class FloatingPlayerManager: ObservableObject {
         }
         floating.setFrameAutosaveName(Self.frameAutosaveName)
 
-        hiddenMainWindow = NSApp.windows.first { $0.isVisible && $0.canBecomeMain && $0 !== floating }
-        hiddenMainWindow?.orderOut(nil)
+        let source = sourceWindow ?? Self.fallbackSourceWindow(excluding: floating)
+        sourceWindow = source
+        source?.orderOut(nil)
 
         floating.makeKeyAndOrderFront(nil)
         window = floating
+        activeViewModel = viewModel
         isFloating = true
+        observeLifecycle(of: source)
 
         #if canImport(VLCKitSPM)
         // VLC renders into a concrete NSView — rebuild its output for the
@@ -76,18 +111,110 @@ final class FloatingPlayerManager: ObservableObject {
         #endif
     }
 
-    private func exit(viewModel: PlayerViewModel) {
-        window?.saveFrame(usingName: Self.frameAutosaveName)
-        window?.orderOut(nil)
+    /// The single exit. Idempotent, so it is safe from any close path and safe to
+    /// run twice — a Cmd-W that lands during the exit button's own teardown does
+    /// nothing the second time.
+    ///
+    /// `rebuildingSurface` is false on the termination path only. Rebuilding the
+    /// VLC surface restarts playback (`videoSurfaceGeometryChanged()` →
+    /// `startVLCPlayback`), which while quitting would open a fresh connection to
+    /// the provider instead of winding down.
+    private func cleanUp(restoringSource: Bool, rebuildingSurface: Bool = true) {
+        let floating = window
         window = nil
+        stopObserving()
 
-        hiddenMainWindow?.makeKeyAndOrderFront(nil)
-        hiddenMainWindow = nil
+        if let floating {
+            floating.saveFrame(usingName: Self.frameAutosaveName)
+            // Detach before ordering out: close() would otherwise re-enter
+            // windowWillClose and run this again.
+            floating.delegate = nil
+            floating.orderOut(nil)
+        }
+
+        if restoringSource {
+            restoreSourceWindow()
+        }
+        sourceWindow = nil
         isFloating = false
 
         #if canImport(VLCKitSPM)
-        viewModel.videoSurfaceGeometryChanged()
+        if rebuildingSurface {
+            activeViewModel?.videoSurfaceGeometryChanged()
+        }
         #endif
+        activeViewModel = nil
+    }
+
+    /// Bring back the exact window we hid. If it was closed while floating, fall
+    /// back to any other main-capable window so the user is never left without
+    /// one.
+    private func restoreSourceWindow() {
+        let restored = sourceWindow ?? Self.fallbackSourceWindow(excluding: window)
+        restored?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Only used when no source window was recorded — a main-capable window that
+    /// isn't the floating one. Prefers the key window over an arbitrary pick.
+    private static func fallbackSourceWindow(excluding floating: NSWindow?) -> NSWindow? {
+        if let key = NSApp.keyWindow, key !== floating, key.canBecomeMain {
+            return key
+        }
+        return NSApp.windows.first { $0.isVisible && $0.canBecomeMain && $0 !== floating }
+    }
+
+    private func observeLifecycle(of source: NSWindow?) {
+        let center = NotificationCenter.default
+        // Quitting while floating would otherwise persist a hidden main window
+        // into the next launch's state restoration.
+        observers.append(center.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // Restore and persist state, but do not rebuild the video surface —
+            // that would restart playback on the way out.
+            MainActor.assumeIsolated {
+                self?.cleanUp(restoringSource: true, rebuildingSurface: false)
+            }
+        })
+
+        guard let source else { return }
+        observers.append(center.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: source,
+            queue: .main
+        ) { [weak self] _ in
+            // The window we hid is going away. Exit floating rather than keep a
+            // stream — and the provider's connection slot — alive with no owning
+            // view. There is nothing to restore, so clearing the reference first
+            // makes cleanUp fall back to whatever window remains. This is also
+            // what the browser's own onDisappear does, so the two paths agree
+            // instead of fighting; cleanUp is idempotent, so whichever runs
+            // second is a no-op.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.sourceWindow = nil
+                self.cleanUp(restoringSource: true)
+            }
+        })
+    }
+
+    private func stopObserving() {
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension FloatingPlayerManager: NSWindowDelegate {
+    /// Cmd-W, performClose(_:), or anything else that closes the floating window
+    /// behind our back. Without this the main window stayed ordered out and
+    /// `isFloating` stayed true, leaving no way back.
+    func windowWillClose(_ notification: Notification) {
+        guard (notification.object as? NSWindow) === window else { return }
+        cleanUp(restoringSource: true)
     }
 }
 
@@ -137,6 +264,30 @@ private struct FloatingPlayerContent: View {
             }
         default:
             EmptyView()
+        }
+    }
+}
+
+/// Reports the window hosting the browser, so ``FloatingPlayerManager`` hides and
+/// restores that exact window instead of picking one out of `NSApp.windows` —
+/// where the Settings window is main-capable too and could be chosen instead.
+struct HostWindowReader: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = WindowReportingView()
+        view.onResolve = onResolve
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class WindowReportingView: NSView {
+        var onResolve: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onResolve?(window)
         }
     }
 }
