@@ -92,12 +92,16 @@ struct AccountSettingsTab: View {
             }
 
             if let account = appModel.account {
-                Section("Current account") {
+                Section {
                     LabeledContent("Server", value: account.host.absoluteString)
                     LabeledContent("Username", value: account.username)
                     LabeledContent("Transport") {
+                        // Deliberately scoped to the panel API: stream requests
+                        // follow whatever URLs the panel serves and the media
+                        // engines offer no redirect enforcement, so the app
+                        // must not claim playback transport is secured.
                         if account.usesSecureTransport {
-                            Label("HTTPS (encrypted)", systemImage: "lock.fill")
+                            Label("HTTPS (panel API encrypted)", systemImage: "lock.fill")
                         } else {
                             Label("HTTP (unencrypted)", systemImage: "lock.open")
                                 .foregroundStyle(.orange)
@@ -106,6 +110,11 @@ struct AccountSettingsTab: View {
                     Button("Remove Account", role: .destructive) {
                         viewModel.removeAccount(from: appModel)
                     }
+                } header: {
+                    Text("Current account")
+                } footer: {
+                    Text("Stream playback follows the URLs your panel serves; their transport is controlled by the provider.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
