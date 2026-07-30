@@ -50,6 +50,8 @@ struct TVBrowserShell: View {
                     } label: {
                         Image(systemName: "gearshape")
                     }
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("browser.settingsButton")
                 }
             }
         }
@@ -61,9 +63,9 @@ struct TVBrowserShell: View {
 
     private func title(for selection: CategorySelection) -> String {
         switch selection {
-        case .all: return "All Channels"
-        case .favorites: return "Favorites"
-        case .category(let id): return channels.categories.first { $0.id == id }?.name ?? "Channels"
+        case .all: return String(localized: "All Channels")
+        case .favorites: return String(localized: "Favorites")
+        case .category(let id): return channels.categories.first { $0.id == id }?.name ?? String(localized: "Channels")
         }
     }
 }
@@ -93,7 +95,9 @@ struct TVChannelListScreen: View {
                             .foregroundStyle(.secondary)
                         Text("No favorites yet")
                             .font(.headline)
-                        Text("Focus a channel and press the star to add it.")
+                        // The star on a row is an indicator, not a control —
+                        // the copy names the actions that actually exist.
+                        Text("Focus a channel and press Play/Pause to add it, or hold for more options.")
                             .foregroundStyle(.secondary)
                     }
                 } else {

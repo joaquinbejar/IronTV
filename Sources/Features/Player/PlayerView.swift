@@ -49,6 +49,7 @@ struct PlayerView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .accessibilityLabel(viewModel.engine == .vlc ? "Playing with the VLC engine" : "Playing with the Apple engine")
+                                .accessibilityIdentifier("player.engineChip")
                         }
                     }
                     ToolbarItem {
@@ -58,6 +59,8 @@ struct PlayerView: View {
                             Image(systemName: "arrow.triangle.2.circlepath")
                         }
                         .help("Resync audio/video with the live stream")
+                        .accessibilityLabel("Resync with the live stream")
+                        .accessibilityIdentifier("player.resyncButton")
                         .disabled(viewModel.currentStream == nil)
                     }
                     #if os(macOS)
@@ -67,6 +70,8 @@ struct PlayerView: View {
                                 Image(systemName: "pip.swap")
                             }
                             .help("Floating mini player (always on top)")
+                            .accessibilityLabel("Floating mini player")
+                            .accessibilityIdentifier("player.floatingButton")
                             .disabled(viewModel.currentStream == nil)
                         }
                     }
@@ -75,6 +80,8 @@ struct PlayerView: View {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                         }
                         .help("Toggle Full Screen")
+                        .accessibilityLabel("Toggle full screen")
+                        .accessibilityIdentifier("player.fullScreenButton")
                     }
                     #endif
                 }
@@ -199,6 +206,7 @@ struct PlayerView: View {
             Image(systemName: "play.tv")
                 .font(.system(size: 40))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text("Select a channel to start watching")
                 .foregroundStyle(.secondary)
         }
@@ -218,6 +226,7 @@ struct PlayerView: View {
             Button("Retry") {
                 viewModel.retry()
             }
+            .accessibilityIdentifier("player.retryButton")
         }
         .padding(24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))

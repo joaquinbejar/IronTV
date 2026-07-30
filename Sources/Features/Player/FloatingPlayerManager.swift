@@ -243,6 +243,8 @@ private struct FloatingPlayerContent: View {
                 .buttonStyle(.plain)
                 .padding(10)
                 .help("Return to the main window")
+                .accessibilityLabel("Return to the main window")
+                .accessibilityIdentifier("player.exitFloatingButton")
             }
         }
         .onHover { hovering = $0 }

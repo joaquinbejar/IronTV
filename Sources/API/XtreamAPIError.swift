@@ -9,13 +9,14 @@ public enum XtreamAPIError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Could not build a valid request URL for this panel."
+            return String(localized: "Could not build a valid request URL for this panel.")
         case .network(let underlying):
-            return "Network error: \(underlying.localizedDescription)"
+            return String(localized: "Network error: \(underlying.localizedDescription)")
         case .httpStatus(let code):
-            return "The panel answered with HTTP \(code)."
+            let codeText = "\(code)"
+            return String(localized: "The panel answered with HTTP \(codeText).")
         case .decoding:
-            return "The panel sent a response this app couldn't read."
+            return String(localized: "The panel sent a response this app couldn't read.")
         }
     }
 }

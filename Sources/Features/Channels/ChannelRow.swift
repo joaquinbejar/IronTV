@@ -21,16 +21,23 @@ struct ChannelRow: View {
             #if os(tvOS)
             // Rows are single focusables on tvOS — the star is an indicator;
             // toggling happens via long-press menu or the play/pause button.
+            // Never color-only: filled vs outline carries the state, and the
+            // row's accessibility value carries it for VoiceOver.
             Image(systemName: isFavorite ? "star.fill" : "star")
                 .foregroundStyle(isFavorite ? .yellow : .secondary)
+                .accessibilityHidden(true)
             #else
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "star.fill" : "star")
                     .foregroundStyle(isFavorite ? .yellow : .secondary)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(isFavorite ? "Remove from Favorites" : "Add to Favorites")
+            .accessibilityIdentifier("channel.favoriteToggle")
             #endif
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isFavorite ? "Favorite" : "Not a favorite")
         .contextMenu {
             Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", action: toggleFavorite)
         }

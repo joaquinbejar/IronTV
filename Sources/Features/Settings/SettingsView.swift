@@ -48,7 +48,7 @@ struct LicenseTab: View {
     private var licenseText: String {
         guard let url = Bundle.main.url(forResource: "LICENSE", withExtension: nil),
               let text = try? String(contentsOf: url, encoding: .utf8) else {
-            return "License file missing from the app bundle."
+            return String(localized: "License file missing from the app bundle.")
         }
         return text
     }
@@ -168,11 +168,14 @@ struct AccountSettingsTab: View {
 
     @ViewBuilder
     private var revealToggle: some View {
-        let label = viewModel.isRevealingURL ? "Hide playlist URL" : "Show playlist URL"
+        let label = viewModel.isRevealingURL
+            ? String(localized: "Hide playlist URL")
+            : String(localized: "Show playlist URL")
         #if os(tvOS)
         // The focus engine needs a real, labelled control here.
         Button(viewModel.isRevealingURL ? "Hide" : "Show") { viewModel.toggleURLReveal() }
             .accessibilityLabel(label)
+            .accessibilityIdentifier("settings.revealToggle")
         #else
         Button {
             viewModel.toggleURLReveal()
@@ -182,6 +185,7 @@ struct AccountSettingsTab: View {
         .buttonStyle(.plain)
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityIdentifier("settings.revealToggle")
         #endif
     }
 
@@ -258,8 +262,8 @@ struct PlaybackSettingsTab: View {
             }
 
             Section {
-                secondsStepper("Forward buffer", value: $model.settings.forwardBufferSeconds, in: PlaybackSettings.forwardBufferRange, step: 5)
-                secondsStepper("Live delay (stall cushion)", value: $model.settings.liveEdgeOffsetSeconds, in: PlaybackSettings.liveEdgeOffsetRange, step: 5)
+                secondsStepper(String(localized: "Forward buffer"), value: $model.settings.forwardBufferSeconds, in: PlaybackSettings.forwardBufferRange, step: 5)
+                secondsStepper(String(localized: "Live delay (stall cushion)"), value: $model.settings.liveEdgeOffsetSeconds, in: PlaybackSettings.liveEdgeOffsetRange, step: 5)
                 Toggle("Fast start (may stutter on weak connections)", isOn: $model.settings.fastStart)
             } header: {
                 Text("Buffering (Apple engine)")
@@ -270,10 +274,10 @@ struct PlaybackSettingsTab: View {
             .disabled(model.settings.preferredEngine == .vlc)
 
             Section {
-                secondsStepper("Reconnect after buffering for", value: $model.settings.waitingTimeoutSeconds, in: PlaybackSettings.waitingTimeoutRange, step: 1)
-                secondsStepper("Reconnect after frozen video for", value: $model.settings.frozenTimeoutSeconds, in: PlaybackSettings.frozenTimeoutRange, step: 1)
-                secondsStepper("Health check interval", value: $model.settings.watchdogIntervalSeconds, in: PlaybackSettings.watchdogIntervalRange, step: 1)
-                intStepper("Fast reconnect attempts", value: $model.settings.maxReconnectAttempts, in: PlaybackSettings.maxReconnectAttemptsRange)
+                secondsStepper(String(localized: "Reconnect after buffering for"), value: $model.settings.waitingTimeoutSeconds, in: PlaybackSettings.waitingTimeoutRange, step: 1)
+                secondsStepper(String(localized: "Reconnect after frozen video for"), value: $model.settings.frozenTimeoutSeconds, in: PlaybackSettings.frozenTimeoutRange, step: 1)
+                secondsStepper(String(localized: "Health check interval"), value: $model.settings.watchdogIntervalSeconds, in: PlaybackSettings.watchdogIntervalRange, step: 1)
+                intStepper(String(localized: "Fast reconnect attempts"), value: $model.settings.maxReconnectAttempts, in: PlaybackSettings.maxReconnectAttemptsRange)
             } header: {
                 Text("Auto-reconnect")
             } footer: {
@@ -282,7 +286,7 @@ struct PlaybackSettingsTab: View {
             }
 
             Section("Network") {
-                secondsStepper("API request timeout", value: $model.settings.apiTimeoutSeconds, in: PlaybackSettings.apiTimeoutRange, step: 5)
+                secondsStepper(String(localized: "API request timeout"), value: $model.settings.apiTimeoutSeconds, in: PlaybackSettings.apiTimeoutRange, step: 5)
             }
 
             Section {

@@ -45,6 +45,8 @@ struct DesktopBrowserShell: View {
                             } label: {
                                 Image(systemName: "gearshape")
                             }
+                            .accessibilityLabel("Settings")
+                            .accessibilityIdentifier("browser.settingsButton")
                         }
                     }
             } content: {
@@ -74,6 +76,8 @@ struct DesktopBrowserShell: View {
                             } label: {
                                 Image(systemName: "gearshape")
                             }
+                            .accessibilityLabel("Settings")
+                            .accessibilityIdentifier("browser.settingsButton")
                         }
                     }
                 #endif

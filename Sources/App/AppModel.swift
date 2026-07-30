@@ -91,7 +91,7 @@ final class AppModel: ObservableObject {
     /// (status codes and fixed strings), or a generic fallback — never an
     /// arbitrary error's own text.
     static func nonSecretMessage(for error: Error) -> String {
-        (error as? KeychainError)?.errorDescription ?? "The stored account could not be accessed."
+        (error as? KeychainError)?.errorDescription ?? String(localized: "The stored account could not be accessed.")
     }
 
     private static func loadAvailability(from store: AccountStoring) -> AccountAvailability {
