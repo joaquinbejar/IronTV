@@ -23,27 +23,26 @@ final class AppModel: ObservableObject {
     }
 
     private let store: AccountStoring
+    private let discardLegacyChannelKeys: () -> Void
 
-    init(store: AccountStoring = KeychainStore()) {
+    init(
+        store: AccountStoring = KeychainStore(),
+        discardLegacyChannelKeys: @escaping () -> Void = { LastChannelStore.discardLegacyValues() }
+    ) {
         self.store = store
+        self.discardLegacyChannelKeys = discardLegacyChannelKeys
+        self.availability = .loaded(nil) // replaced by the transition below
         if DemoMode.isActive {
-            availability = .loaded(DemoMode.account)
+            transition(to: .loaded(DemoMode.account))
         } else {
-            availability = Self.loadAvailability(from: store)
-        }
-        if case .loaded(nil) = availability {
-            // Genuinely no account: nothing to migrate the pre-scoping
-            // last-channel keys into, so drop them rather than let the next
-            // account inherit them. Deliberately NOT done on a failed load —
-            // an account probably still exists there.
-            LastChannelStore.discardLegacyValues()
+            transition(to: Self.loadAvailability(from: store))
         }
     }
 
     /// Retry after a failed startup load — e.g. once the Keychain becomes
     /// available again.
     func reloadAccount() {
-        availability = Self.loadAvailability(from: store)
+        transition(to: Self.loadAvailability(from: store))
     }
 
     /// Recovery for an unreadable stored account (corrupted payload, or an
@@ -51,27 +50,41 @@ final class AppModel: ObservableObject {
     /// return to the clean no-account state so it can be added again.
     func discardUnreadableAccount() throws {
         try store.deleteAccount()
-        availability = .loaded(nil)
+        transition(to: .loaded(nil))
     }
 
     func saveAccount(_ account: Account) throws {
         try store.saveAccount(account)
-        availability = .loaded(account)
+        transition(to: .loaded(account))
     }
 
     func removeAccount() throws {
         if account == DemoMode.account {
-            availability = .loaded(nil) // sample mode isn't persisted; just exit it
+            transition(to: .loaded(nil)) // sample mode isn't persisted; just exit it
             return
         }
         try store.deleteAccount()
-        availability = .loaded(nil)
+        transition(to: .loaded(nil))
     }
 
     /// User-facing "Sample channels": browse and play legal public streams
-    /// without a subscription. Not persisted to the Keychain.
+    /// without a subscription. Not persisted to the Keychain, and deliberately
+    /// reachable from the failed state — sample playback needs no credentials.
     func startSampleMode() {
-        availability = .loaded(DemoMode.account)
+        transition(to: .loaded(DemoMode.account))
+    }
+
+    /// Every availability change funnels through here so the empty state gets
+    /// its cleanup no matter which path reached it: whenever there is
+    /// genuinely no account, the pre-scoping last-channel keys are dropped so
+    /// the next account cannot inherit a previous provider's selection.
+    /// Deliberately NOT done on a failed load — an account probably still
+    /// exists there.
+    private func transition(to newValue: AccountAvailability) {
+        availability = newValue
+        if case .loaded(nil) = newValue {
+            discardLegacyChannelKeys()
+        }
     }
 
     /// Fixed, non-secret copy only: a typed `KeychainError` description

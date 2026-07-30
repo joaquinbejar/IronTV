@@ -23,6 +23,17 @@ final class AppModelTests: XCTestCase {
         password: "pass1"
     )
 
+    /// Counts the legacy last-channel cleanups so tests never touch the real
+    /// synced storage.
+    private final class CleanupSpy {
+        private(set) var count = 0
+        func bump() { count += 1 }
+    }
+
+    private func makeModel(_ store: FakeStore, cleanups: CleanupSpy = CleanupSpy()) -> AppModel {
+        AppModel(store: store, discardLegacyChannelKeys: { cleanups.bump() })
+    }
+
     func testFailedLoadIsADistinctStateWithANonSecretMessage() {
         let store = FakeStore()
         store.loadResult = .failure(KeychainError.corruptedData)
@@ -92,5 +103,54 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.availability, .loaded(account))
         try model.removeAccount()
         XCTAssertEqual(model.availability, .loaded(nil))
+    }
+
+    // MARK: - Empty-state cleanup on every transition
+
+    func testFailedLoadDoesNotDiscardLegacyChannelKeys() {
+        let store = FakeStore()
+        store.loadResult = .failure(KeychainError.corruptedData)
+        let cleanups = CleanupSpy()
+
+        _ = makeModel(store, cleanups: cleanups)
+
+        XCTAssertEqual(cleanups.count, 0, "an account probably still exists — its keys must survive")
+    }
+
+    func testRetryThatLandsOnNoAccountDiscardsLegacyChannelKeys() {
+        let store = FakeStore()
+        store.loadResult = .failure(KeychainError.corruptedData)
+        let cleanups = CleanupSpy()
+        let model = makeModel(store, cleanups: cleanups)
+
+        store.loadResult = .success(nil)
+        model.reloadAccount()
+
+        XCTAssertEqual(model.availability, .loaded(nil))
+        XCTAssertEqual(cleanups.count, 1)
+    }
+
+    func testDiscardingTheUnreadableAccountDiscardsLegacyChannelKeys() throws {
+        let store = FakeStore()
+        store.loadResult = .failure(KeychainError.corruptedData)
+        let cleanups = CleanupSpy()
+        let model = makeModel(store, cleanups: cleanups)
+
+        try model.discardUnreadableAccount()
+
+        XCTAssertEqual(cleanups.count, 1)
+    }
+
+    // MARK: - Sample mode stays reachable
+
+    func testSampleModeIsReachableFromTheFailedState() {
+        let store = FakeStore()
+        store.loadResult = .failure(KeychainError.unexpectedStatus(-34018))
+        store.deleteError = KeychainError.unexpectedStatus(-34018)
+        let model = makeModel(store)
+
+        model.startSampleMode()
+
+        XCTAssertNotNil(model.account, "sample playback needs no stored credentials")
     }
 }

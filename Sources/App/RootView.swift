@@ -78,6 +78,17 @@ private struct AccountLoadFailureView: View {
                 }
             }
             .buttonStyle(.bordered)
+            // Non-destructive escape that works even when the Keychain can
+            // neither be read nor deleted — sample playback needs no stored
+            // credentials.
+            Button("Try Sample Channels") {
+                appModel.startSampleMode()
+            }
+            .buttonStyle(.bordered)
+            Text("Sample channels play free public demo streams — no subscription needed.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             if let recoveryError {
                 Label(recoveryError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)

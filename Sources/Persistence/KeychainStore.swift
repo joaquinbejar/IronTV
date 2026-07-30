@@ -70,6 +70,11 @@ public struct KeychainStore {
     }
 
     public func loadAccount() throws -> Account? {
+        // "No account" is only a trustworthy answer when at least one backend
+        // was actually readable. If every backend reports a missing
+        // entitlement, nothing was consulted — that must surface as a failure,
+        // not as the empty state.
+        var sawUsableBackend = false
         for backend in Self.backends {
             var query = baseQuery(backend)
             query[kSecReturnData as String] = true
@@ -96,11 +101,17 @@ public struct KeychainStore {
                     }
                 }
                 return account
-            case errSecItemNotFound, errSecMissingEntitlement:
+            case errSecItemNotFound:
+                sawUsableBackend = true
+            case errSecMissingEntitlement:
+                // Keep probing: on macOS the legacy backend can still answer.
                 continue
             default:
                 throw KeychainError.unexpectedStatus(status)
             }
+        }
+        guard sawUsableBackend else {
+            throw KeychainError.unexpectedStatus(errSecMissingEntitlement)
         }
         return nil
     }

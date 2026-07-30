@@ -87,6 +87,26 @@ final class KeychainStoreTests: XCTestCase {
         }
     }
 
+    func testLoadFailsWhenNoBackendIsUsable() {
+        let client = ScriptedSecItemClient()
+        // Every backend reports a missing entitlement: nothing was actually
+        // consulted, so "no account" would be a lie — this must fail.
+        client.copyResults = [(errSecMissingEntitlement, nil), (errSecMissingEntitlement, nil)]
+
+        XCTAssertThrowsError(try makeStore(client).loadAccount()) { error in
+            XCTAssertEqual(error as? KeychainError, .unexpectedStatus(errSecMissingEntitlement))
+        }
+    }
+
+    func testLoadTrustsAnEmptyLegacyBackendWhenDataProtectionIsUnavailable() throws {
+        let client = ScriptedSecItemClient()
+        // The macOS fallback: data protection unusable, legacy readable and
+        // genuinely empty — nil is a trustworthy answer here.
+        client.copyResults = [(errSecMissingEntitlement, nil), (errSecItemNotFound, nil)]
+
+        XCTAssertNil(try makeStore(client).loadAccount())
+    }
+
     func testLoadSurfacesUnexpectedStatuses() {
         let client = ScriptedSecItemClient()
         client.copyResults = [(errSecAuthFailed, nil)]
