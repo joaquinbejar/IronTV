@@ -35,6 +35,17 @@ final class PlaybackTransportPolicyTests: XCTestCase {
         XCTAssertEqual(verdict("", origin: httpOrigin), .acceptable)
     }
 
+    /// The review's bypass: a scheme-relative URI resolves with the planned
+    /// scheme onto a different host — it must be judged as the absolute URL
+    /// it becomes, not skipped as "relative".
+    func testSchemeRelativeURIsResolveBeforeJudging() {
+        XCTAssertEqual(verdict("//evil.example.net/segments/1.ts", origin: httpOrigin), .crossOrigin)
+        XCTAssertEqual(verdict("//host.example.com:8080/segments/1.ts", origin: httpOrigin), .acceptable)
+        // https planned origin + scheme-relative to another host is judged on
+        // the resolved https URL: still cross-origin.
+        XCTAssertEqual(verdict("//cdn.example.org/x.ts", origin: httpsOrigin), .crossOrigin)
+    }
+
     /// Absolute non-web or hostless URIs can never be the planned origin.
     func testAbsoluteNonWebURIsAreViolations() {
         XCTAssertEqual(verdict("file:///etc/passwd", origin: httpOrigin), .crossOrigin)

@@ -17,12 +17,15 @@ public enum PlaybackTransportVerdict: Equatable, Sendable {
 /// prevention: the first request already happened, which is documented).
 /// Reuses the same same-origin rule that guards the API requests.
 public enum PlaybackTransportPolicy {
-    /// Relative or unparsable URIs are acceptable: they resolve against the
-    /// planned origin by construction. Absolute URIs on non-web schemes
-    /// (file:, data:, …) or without a host can never be the planned origin —
-    /// they count as cross-origin, not as noise.
+    /// Every URI is resolved against the planned origin before judging, the
+    /// way HLS itself resolves it — so relative paths become same-origin by
+    /// construction, and a scheme-relative `//other-host/…` form resolves to
+    /// an absolute cross-origin URL instead of slipping past as "relative".
+    /// Unparsable input stays acceptable (nothing resolvable was requested);
+    /// absolute non-web schemes (file:, data:, …) or hostless URLs can never
+    /// be the planned origin and count as cross-origin.
     public static func verdict(observedURI: String, plannedOrigin: URL) -> PlaybackTransportVerdict {
-        guard let observed = URL(string: observedURI),
+        guard let observed = URL(string: observedURI, relativeTo: plannedOrigin)?.absoluteURL,
               let scheme = observed.scheme?.lowercased() else {
             return .acceptable
         }
