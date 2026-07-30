@@ -91,7 +91,11 @@ final class ChannelsViewModel: ObservableObject {
         if !isDemo {
             capabilitiesTask = Task { [weak self] () -> Void in
                 guard let fetch = self?.makeCapabilitiesFetch() else { return }
-                let status = try? await fetch.value
+                let status = try? await withTaskCancellationHandler {
+                    try await fetch.value
+                } onCancel: {
+                    fetch.cancel()
+                }
                 guard let self, !Task.isCancelled, let status else { return }
                 self.allowedFormats = status.allowedOutputFormats
             }
@@ -205,7 +209,17 @@ final class ChannelsViewModel: ObservableObject {
             panelHost: panelHost
         )
         let hls = selection.useHLS ? try client.playbackURL(for: streamID, format: .hls) : nil
-        let ts = selection.useTS ? try? client.playbackURL(for: streamID, format: .ts) : nil
+        let ts: URL?
+        if selection.useTS {
+            // As the optional alternative next to HLS a failure is tolerable;
+            // as the PRIMARY route (TS-only panel) it must surface instead of
+            // being misdiagnosed as "nothing playable".
+            ts = selection.useHLS
+                ? try? client.playbackURL(for: streamID, format: .ts)
+                : try client.playbackURL(for: streamID, format: .ts)
+        } else {
+            ts = nil
+        }
         if let hls {
             return PlaybackPlan(primaryURL: hls, tsURL: ts, hlsAvailable: true)
         }
