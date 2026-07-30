@@ -19,13 +19,31 @@ public struct FlexibleInt: Codable, Equatable, Sendable {
         } else if let int = try? container.decode(Int.self) {
             wrappedValue = int
         } else if let double = try? container.decode(Double.self) {
-            wrappedValue = Int(double)
+            wrappedValue = Self.int(fromPanelDouble: double)
         } else if let string = try? container.decode(String.self) {
             let trimmed = string.trimmingCharacters(in: .whitespaces)
-            wrappedValue = Int(trimmed) ?? Double(trimmed).map(Int.init)
+            wrappedValue = Int(trimmed) ?? Double(trimmed).flatMap(Self.int(fromPanelDouble:))
         } else {
             wrappedValue = nil
         }
+    }
+
+    /// The single conversion used for every non-integer numeric input, whether it
+    /// arrived as a JSON double or as a string that only parses as one.
+    ///
+    /// Panel data is untrusted, so anything `Int` cannot represent is rejected as
+    /// `nil` instead of trapping: non-finite values (`nan`, `inf`, and string
+    /// spellings such as `"NaN"` or `"-infinity"`) and magnitudes outside
+    /// `Int.min ... Int.max`, including large exponents like `1e100`.
+    ///
+    /// Fractional-value policy: fractional values truncate **toward zero**
+    /// (`5.7` → `5`, `-5.7` → `-5`), preserving what this decoder has always done
+    /// for the `5.0`-style integrals panels actually send. A magnitude below one
+    /// therefore decodes as `0` rather than `nil`.
+    static func int(fromPanelDouble double: Double) -> Int? {
+        guard double.isFinite else { return nil }
+        // Truncating first leaves the exactness check to reject range only.
+        return Int(exactly: double.rounded(.towardZero))
     }
 
     public func encode(to encoder: Encoder) throws {
