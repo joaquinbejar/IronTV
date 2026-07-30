@@ -74,14 +74,18 @@ struct PlayerView: View {
         #if os(iOS)
             .statusBarHidden(chromeHidden)
             .toolbar(chromeHidden ? .hidden : .automatic, for: .navigationBar)
-            .onChange(of: chromeHidden) {
+            .task(id: GeometryRestartKey(chromeHidden: chromeHidden, generation: viewModel.playbackGeneration)) {
                 // Wait for the rotation animation to settle — restarting VLC
                 // against mid-rotation bounds sizes the video for the old
-                // orientation (small video in a black frame).
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 600_000_000)
-                    viewModel.videoSurfaceGeometryChanged()
-                }
+                // orientation (small video in a black frame). task(id:) makes
+                // this cancellable: a newer geometry change, a channel/engine
+                // change (generation bump), or disappearance kills the
+                // pending restart instead of letting it fire on a newer
+                // playback. The view model additionally skips restarts whose
+                // surface size didn't materially change.
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                guard !Task.isCancelled else { return }
+                viewModel.videoSurfaceGeometryChanged()
             }
         #endif
     }
@@ -120,14 +124,16 @@ struct PlayerView: View {
                 errorOverlay(message)
             }
         }
-        .onChange(of: viewModel.state) { _, state in
-            switch state {
+        .task(id: viewModel.state) {
+            // Bound to the exact transition: every state change cancels the
+            // pending delay, so no orphan sleep can flip the overlay after
+            // the transition (or the view) is gone.
+            switch viewModel.state {
             case .buffering, .reconnecting:
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: Self.overlayDelay)
-                    if viewModel.state == .buffering || viewModel.state == .reconnecting {
-                        showTransientOverlay = true
-                    }
+                try? await Task.sleep(nanoseconds: Self.overlayDelay)
+                guard !Task.isCancelled else { return }
+                if viewModel.state == .buffering || viewModel.state == .reconnecting {
+                    showTransientOverlay = true
                 }
             default:
                 showTransientOverlay = false
@@ -179,4 +185,11 @@ struct PlayerView: View {
         .padding(24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
+}
+
+/// Identity for the pending VLC geometry restart: a change in either field
+/// cancels the previous delay via `.task(id:)`.
+private struct GeometryRestartKey: Equatable {
+    let chromeHidden: Bool
+    let generation: UInt64
 }
