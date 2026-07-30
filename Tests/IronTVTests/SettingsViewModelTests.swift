@@ -371,4 +371,25 @@ final class SettingsViewModelTests: XCTestCase {
         await gate.open()
         await submission.value
     }
+
+    // MARK: - Success copy
+
+    func testSuccessMessageDistinguishesExpiryShapes() {
+        let now = Date(timeIntervalSince1970: 1_750_000_000)
+        let future = Date(timeIntervalSince1970: 1_803_727_680)
+        let past = Date(timeIntervalSince1970: 1_600_000_000)
+
+        XCTAssertEqual(
+            SettingsViewModel.successMessage(expiryDate: nil, now: now),
+            "Account valid (no expiry reported)"
+        )
+        XCTAssertEqual(
+            SettingsViewModel.successMessage(expiryDate: future, now: now),
+            "Account valid until \(future.formatted(date: .abbreviated, time: .omitted))"
+        )
+        XCTAssertEqual(
+            SettingsViewModel.successMessage(expiryDate: past, now: now),
+            "Account valid, but the panel reports it expired on \(past.formatted(date: .abbreviated, time: .omitted))"
+        )
+    }
 }

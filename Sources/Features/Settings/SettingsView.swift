@@ -187,8 +187,7 @@ struct AccountSettingsTab: View {
     }
 
     private func successText(expiryDate: Date?) -> String {
-        guard let expiryDate else { return "Account valid" }
-        return "Account valid until \(expiryDate.formatted(date: .abbreviated, time: .omitted))"
+        SettingsViewModel.successMessage(expiryDate: expiryDate)
     }
 }
 

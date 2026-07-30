@@ -34,8 +34,20 @@ public extension UserInfoDTO {
         AccountStatus(
             authenticated: auth == 1,
             status: status,
-            expiryDate: expDate.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            expiryDate: Self.sanitizedExpiryDate(expDate),
             maxConnections: maxConnections
         )
+    }
+
+    /// Panels report "never expires" inconsistently: `null`, a missing key, `0`,
+    /// or negative garbage. All of those — plus values outside a plausible
+    /// 2000-01-01…2100-01-01 window (tiny positives, millisecond-scale
+    /// timestamps) — map to `nil`, meaning no known expiry. Plausible *past*
+    /// timestamps survive, so a genuinely expired account stays distinguishable
+    /// from a never-expiring one.
+    private static func sanitizedExpiryDate(_ raw: Int?) -> Date? {
+        let plausibleUnixSeconds = 946_684_800...4_102_444_800
+        guard let raw, plausibleUnixSeconds.contains(raw) else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(raw))
     }
 }

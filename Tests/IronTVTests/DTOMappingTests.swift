@@ -60,4 +60,36 @@ final class DTOMappingTests: XCTestCase {
         XCTAssertEqual(status.status, "Expired")
         XCTAssertNil(status.expiryDate)
     }
+
+    func testUserInfoMappingExpirySentinelsMapToNoKnownExpiry() throws {
+        let sentinels: [(label: String, json: String)] = [
+            ("missing", #"{"user_info": {"auth": 1}}"#),
+            ("null", #"{"user_info": {"auth": 1, "exp_date": null}}"#),
+            ("zero Int", #"{"user_info": {"auth": 1, "exp_date": 0}}"#),
+            ("zero String", #"{"user_info": {"auth": 1, "exp_date": "0"}}"#),
+            ("negative", #"{"user_info": {"auth": 1, "exp_date": -1}}"#),
+            ("implausibly small", #"{"user_info": {"auth": 1, "exp_date": 1}}"#),
+            ("millisecond-scale", #"{"user_info": {"auth": 1, "exp_date": 1767225600000}}"#),
+        ]
+        for (label, json) in sentinels {
+            let dto = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(json.utf8))
+            let status = try XCTUnwrap(dto.userInfo).toDomain()
+
+            XCTAssertNil(status.expiryDate, "\(label) exp_date must map to no known expiry")
+            XCTAssertTrue(status.authenticated, "\(label) exp_date must not affect authentication")
+        }
+    }
+
+    func testUserInfoMappingKeepsPlausiblePastAndFutureExpiry() throws {
+        // A plausible past timestamp must survive as a real Date, so an expired
+        // account stays distinguishable from a never-expiring one.
+        let past = #"{"user_info": {"auth": 1, "exp_date": 1600000000}}"#
+        let future = #"{"user_info": {"auth": 1, "exp_date": "1803727680"}}"#
+
+        let pastStatus = try XCTUnwrap(JSONDecoder().decode(AccountInfoDTO.self, from: Data(past.utf8)).userInfo).toDomain()
+        let futureStatus = try XCTUnwrap(JSONDecoder().decode(AccountInfoDTO.self, from: Data(future.utf8)).userInfo).toDomain()
+
+        XCTAssertEqual(pastStatus.expiryDate, Date(timeIntervalSince1970: 1_600_000_000))
+        XCTAssertEqual(futureStatus.expiryDate, Date(timeIntervalSince1970: 1_803_727_680))
+    }
 }
