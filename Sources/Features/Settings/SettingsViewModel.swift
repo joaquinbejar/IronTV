@@ -6,6 +6,9 @@ final class SettingsViewModel: ObservableObject {
     enum Phase: Equatable {
         case idle
         case validating
+        /// An http URL parsed, no TLS twin answered, and nothing has been sent
+        /// over plaintext yet — waiting for the user's deliberate go-ahead.
+        case confirmingInsecureTransport
         case success(expiryDate: Date?)
         case failure(String)
     }
@@ -29,10 +32,15 @@ final class SettingsViewModel: ObservableObject {
         didSet {
             // The in-flight request was for text the user has since changed;
             // letting it finish could save an account that doesn't match what
-            // is on screen. Only fires while validating, so the programmatic
-            // clear on success doesn't cancel its own completion.
-            guard urlText != oldValue, phase == .validating else { return }
-            cancelValidation()
+            // is on screen. Only fires while validating or awaiting the HTTP
+            // confirmation, so the programmatic clear on success doesn't
+            // cancel its own completion.
+            guard urlText != oldValue else { return }
+            if phase == .validating {
+                cancelValidation()
+            } else if phase == .confirmingInsecureTransport {
+                cancelInsecureTransport()
+            }
         }
     }
     @Published private(set) var phase: Phase = .idle
@@ -48,14 +56,24 @@ final class SettingsViewModel: ObservableObject {
 
     private let makeClient: ClientFactory
     private let currentSettings: @MainActor () -> PlaybackSettings
+    private let migratePreferences: @MainActor (Account, Account) -> Void
     private var validationTask: Task<Void, Never>?
+    /// The pasted URL an insecure-transport confirmation refers to. Consumed by
+    /// ``confirmInsecureTransport(into:)``; dropped on cancel, edit or dismiss.
+    private var pendingInsecureSubmission: String?
+
+    /// Cap on the HTTPS probe so a filtered TLS port cannot stall the
+    /// insecure-transport warning behind the full API timeout.
+    private static let httpsProbeTimeout: TimeInterval = 8
 
     init(
         makeClient: @escaping ClientFactory = { XtreamClient(account: $0, requestTimeout: $1) },
-        currentSettings: @escaping @MainActor () -> PlaybackSettings = { PlaybackSettingsStore().load() }
+        currentSettings: @escaping @MainActor () -> PlaybackSettings = { PlaybackSettingsStore().load() },
+        migratePreferences: @escaping @MainActor (Account, Account) -> Void = { AccountPreferenceMigrator.migrate(from: $0, to: $1) }
     ) {
         self.makeClient = makeClient
         self.currentSettings = currentSettings
+        self.migratePreferences = migratePreferences
     }
 
     var canSubmit: Bool {
@@ -71,14 +89,50 @@ final class SettingsViewModel: ObservableObject {
     func validateAndSave(into appModel: AppModel) async {
         let submitted = urlText
         validationTask?.cancel()
+        pendingInsecureSubmission = nil
         phase = .validating
 
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.performValidation(of: submitted, into: appModel)
+            await self.performValidation(of: submitted, into: appModel, insecureTransportConfirmed: false)
         }
         validationTask = task
         await task.value
+    }
+
+    /// The user deliberately accepted plain HTTP for the URL that raised the
+    /// warning. Re-runs validation over http; a stale confirmation (text edited,
+    /// nothing pending) is a no-op.
+    func confirmInsecureTransport(into appModel: AppModel) async {
+        guard let submitted = pendingInsecureSubmission, submitted == urlText else { return }
+        pendingInsecureSubmission = nil
+        validationTask?.cancel()
+        phase = .validating
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performValidation(of: submitted, into: appModel, insecureTransportConfirmed: true)
+        }
+        validationTask = task
+        await task.value
+    }
+
+    /// The user declined to send credentials over plain HTTP. Nothing was sent;
+    /// the pasted text stays for editing.
+    func cancelInsecureTransport() {
+        pendingInsecureSubmission = nil
+        if phase == .confirmingInsecureTransport {
+            phase = .idle
+        }
+    }
+
+    /// The confirmation UI went away without an explicit choice (Esc, tap
+    /// outside). Leaves the pending submission so an in-flight Continue action
+    /// scheduled just before the dismissal can still consume it.
+    func insecureConfirmationDismissed() {
+        if phase == .confirmingInsecureTransport {
+            phase = .idle
+        }
     }
 
     /// Stops an in-flight validation. Its completion can no longer mutate the
@@ -86,7 +140,8 @@ final class SettingsViewModel: ObservableObject {
     func cancelValidation() {
         validationTask?.cancel()
         validationTask = nil
-        if phase == .validating {
+        pendingInsecureSubmission = nil
+        if phase == .validating || phase == .confirmingInsecureTransport {
             phase = .idle
         }
     }
@@ -117,22 +172,66 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
-    private func performValidation(of submitted: String, into appModel: AppModel) async {
+    private func performValidation(of submitted: String, into appModel: AppModel, insecureTransportConfirmed: Bool) async {
         do {
             let account = try M3UURLParser.parse(submitted)
-            let client = makeClient(account, currentSettings().apiTimeoutSeconds)
-            let status = try await client.accountStatus()
+            let timeout = currentSettings().apiTimeoutSeconds
+
+            var resolved = account
+            var status: AccountStatus?
+
+            if !account.usesSecureTransport, !insecureTransportConfirmed {
+                // Probing the TLS twin first sends the credentials over HTTPS
+                // only, so it needs no consent — and a verified upgrade means
+                // the warning never has to appear at all.
+                if let secured = Self.httpsVariant(of: account) {
+                    let probe = makeClient(secured, min(timeout, Self.httpsProbeTimeout))
+                    if let probed = try? await probe.accountStatus() {
+                        guard isStillCurrent(submitted) else { return }
+                        if probed.authenticated {
+                            resolved = secured
+                            status = probed
+                        } else {
+                            // The panel answered authoritatively over TLS and
+                            // refused these credentials — plaintext would change
+                            // nothing except exposing them.
+                            phase = .failure(Self.rejectionMessage(for: probed))
+                            return
+                        }
+                    }
+                }
+                guard isStillCurrent(submitted) else { return }
+                if status == nil {
+                    // No TLS endpoint answered. Sending credentials over plain
+                    // HTTP needs a deliberate go-ahead first.
+                    pendingInsecureSubmission = submitted
+                    phase = .confirmingInsecureTransport
+                    return
+                }
+            }
+
+            let finalStatus: AccountStatus
+            if let status {
+                finalStatus = status
+            } else {
+                finalStatus = try await makeClient(resolved, timeout).accountStatus()
+            }
             guard isStillCurrent(submitted) else { return }
 
-            guard status.authenticated else {
-                let detail = status.status.map { " (status: \($0))" } ?? ""
-                phase = .failure("The panel rejected these credentials\(detail).")
+            guard finalStatus.authenticated else {
+                phase = .failure(Self.rejectionMessage(for: finalStatus))
                 return
             }
-            try appModel.saveAccount(account)
+            if resolved.host != account.host, let previous = appModel.account,
+               previous.username == resolved.username, previous.host == account.host {
+                // The verified upgrade changes the preference namespace (it
+                // embeds the scheme) — carry favorites and last channel across.
+                migratePreferences(previous, resolved)
+            }
+            try appModel.saveAccount(resolved)
             // Phase first: it takes urlText out of the validating state, so
             // clearing the field below doesn't cancel this completion.
-            phase = .success(expiryDate: status.expiryDate)
+            phase = .success(expiryDate: finalStatus.expiryDate)
             clearCredentialInput()
         } catch is CancellationError {
             return
@@ -140,6 +239,21 @@ final class SettingsViewModel: ObservableObject {
             guard isStillCurrent(submitted) else { return }
             phase = .failure(errorMessage(for: error))
         }
+    }
+
+    private static func rejectionMessage(for status: AccountStatus) -> String {
+        let detail = status.status.map { " (status: \($0))" } ?? ""
+        return "The panel rejected these credentials\(detail)."
+    }
+
+    /// The same account with the host scheme swapped to https (port kept).
+    private static func httpsVariant(of account: Account) -> Account? {
+        guard var components = URLComponents(url: account.host, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        components.scheme = "https"
+        guard let host = components.url else { return nil }
+        return Account(host: host, username: account.username, password: account.password)
     }
 
     /// Drops the credential-bearing text **and** re-hides it. Both belong together:

@@ -19,6 +19,7 @@ Native IPTV player for [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes
   - video-only full screen
 - **Tunable playback settings** — buffer sizes, reconnect timeouts, health-check interval, fast start, API timeout; synced via iCloud key-value store (entitlement pending).
 - **Credential hygiene** — credentials live only in the Keychain; logged URLs are redacted.
+- **Transport security** — HTTPS is preferred: when an `http://` playlist URL is pasted, the app first probes the same server over TLS and silently saves the HTTPS endpoint if it answers; otherwise sending credentials over plain HTTP requires an explicit confirmation, and the account's transport state is shown in Settings. ATS remains open (`NSAllowsArbitraryLoads`) by design — the provider host is entered at runtime, so a per-host exception is impossible (rationale documented in `project.yml`).
 
 ## Building
 

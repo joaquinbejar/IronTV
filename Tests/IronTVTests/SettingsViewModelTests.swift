@@ -6,6 +6,8 @@ final class SettingsViewModelTests: XCTestCase {
 
     private let validURL = "http://host.example.com:8080/get.php?username=user1&password=pass1"
     private let otherURL = "http://host.example.com:8080/get.php?username=user2&password=pass2"
+    /// For tests whose subject is transport-independent — https skips the probe.
+    private let validHTTPSURL = "https://host.example.com:8080/get.php?username=user1&password=pass1"
 
     // MARK: - Doubles
 
@@ -95,6 +97,33 @@ final class SettingsViewModelTests: XCTestCase {
         return (viewModel, spy)
     }
 
+    /// Records the migrations the view model requested on a verified upgrade.
+    private final class MigrationSpy {
+        var migrations: [(from: Account, to: Account)] = []
+    }
+
+    /// Variant whose panel double answers per URL scheme, so the https probe
+    /// and the http fallback can be scripted independently.
+    private func makeViewModel(
+        resultsByScheme: [String: Result<AccountStatus, Error>],
+        settings: PlaybackSettings = .default,
+        spy: FactorySpy = FactorySpy(),
+        migrations: MigrationSpy = MigrationSpy()
+    ) -> (SettingsViewModel, FactorySpy) {
+        let viewModel = SettingsViewModel(
+            makeClient: { account, timeout in
+                spy.accounts.append(account)
+                spy.timeouts.append(timeout)
+                let scheme = account.host.scheme?.lowercased() ?? ""
+                let result = resultsByScheme[scheme] ?? .failure(URLError(.unsupportedURL))
+                return FakeClient(result: result)
+            },
+            currentSettings: { settings },
+            migratePreferences: { migrations.migrations.append((from: $0, to: $1)) }
+        )
+        return (viewModel, spy)
+    }
+
     // MARK: - Success
 
     func testSuccessSavesTheAccountAndClearsTheCredentialField() async {
@@ -119,7 +148,7 @@ final class SettingsViewModelTests: XCTestCase {
         settings.apiTimeoutSeconds = 75
         let (viewModel, spy) = makeViewModel(result: .success(authenticated()), settings: settings)
 
-        viewModel.urlText = validURL
+        viewModel.urlText = validHTTPSURL
         await viewModel.validateAndSave(into: AppModel(store: FakeAccountStore()))
 
         XCTAssertEqual(spy.timeouts, [75])
@@ -145,7 +174,7 @@ final class SettingsViewModelTests: XCTestCase {
         let urlError = URLError(.timedOut, userInfo: [NSURLErrorFailingURLStringErrorKey: validURL])
         let (viewModel, _) = makeViewModel(result: .failure(XtreamAPIError.network(urlError)))
 
-        viewModel.urlText = validURL
+        viewModel.urlText = validHTTPSURL
         await viewModel.validateAndSave(into: AppModel(store: store))
 
         guard case .failure(let message) = viewModel.phase else {
@@ -370,6 +399,161 @@ final class SettingsViewModelTests: XCTestCase {
 
         await gate.open()
         await submission.value
+    }
+
+    // MARK: - Insecure transport
+
+    func testHTTPURLUpgradesToVerifiedHTTPSWithoutWarning() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, spy) = makeViewModel(resultsByScheme: ["https": .success(authenticated())])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.scheme, "https")
+        XCTAssertEqual(store.saved?.host.port, 8080, "the upgrade must keep the entered port")
+        XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"], "nothing may go over plain http")
+    }
+
+    func testHTTPURLWithNoTLSEndpointAsksForConfirmationBeforeAnyPlaintext() async {
+        let store = FakeAccountStore()
+        let (viewModel, spy) = makeViewModel(resultsByScheme: [
+            "https": .failure(URLError(.secureConnectionFailed)),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
+        XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"], "no request may hit http before consent")
+        XCTAssertNil(store.saved)
+        XCTAssertEqual(viewModel.urlText, validURL, "the pasted text must stay editable")
+    }
+
+    func testConfirmingInsecureTransportValidatesOverHTTP() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, spy) = makeViewModel(resultsByScheme: [
+            "https": .failure(URLError(.secureConnectionFailed)),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.scheme, "http")
+        XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https", "http"])
+    }
+
+    func testCancellingInsecureTransportSendsAndSavesNothing() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, spy) = makeViewModel(resultsByScheme: [
+            "https": .failure(URLError(.secureConnectionFailed)),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        viewModel.cancelInsecureTransport()
+
+        XCTAssertEqual(viewModel.phase, .idle)
+        XCTAssertNil(store.saved)
+        XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"])
+
+        // A confirmation after cancel must be a stale no-op.
+        await viewModel.confirmInsecureTransport(into: appModel)
+        XCTAssertEqual(viewModel.phase, .idle)
+        XCTAssertEqual(spy.callCount, 1)
+    }
+
+    func testTLSRejectionFailsWithoutFallingBackToPlaintext() async {
+        let store = FakeAccountStore()
+        let (viewModel, spy) = makeViewModel(resultsByScheme: [
+            "https": .success(rejected()),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .failure("The panel rejected these credentials (status: Expired)."))
+        XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"], "refused credentials must not be retried over plaintext")
+        XCTAssertNil(store.saved)
+    }
+
+    func testEditingTextDropsThePendingConfirmation() async {
+        let appModel = AppModel(store: FakeAccountStore())
+        let (viewModel, spy) = makeViewModel(resultsByScheme: [
+            "https": .failure(URLError(.secureConnectionFailed)),
+            "http": .success(authenticated()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
+
+        viewModel.urlText = otherURL
+        XCTAssertEqual(viewModel.phase, .idle)
+
+        await viewModel.confirmInsecureTransport(into: appModel)
+        XCTAssertEqual(spy.callCount, 1, "a confirmation for edited text must not fire")
+    }
+
+    func testHTTPSProbeUsesCappedTimeoutAndFallbackUsesConfiguredOne() async {
+        var settings = PlaybackSettings.default
+        settings.apiTimeoutSeconds = 75
+        let appModel = AppModel(store: FakeAccountStore())
+        let (viewModel, spy) = makeViewModel(
+            resultsByScheme: [
+                "https": .failure(URLError(.secureConnectionFailed)),
+                "http": .success(authenticated()),
+            ],
+            settings: settings
+        )
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(spy.timeouts, [8, 75], "probe is capped so a filtered TLS port can't stall the warning")
+    }
+
+    func testVerifiedUpgradeMigratesPreferencesFromTheHTTPAccount() async throws {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let previous = Account(host: URL(string: "http://host.example.com:8080")!, username: "user1", password: "oldpass")
+        try appModel.saveAccount(previous)
+        let migrations = MigrationSpy()
+        let (viewModel, _) = makeViewModel(
+            resultsByScheme: ["https": .success(authenticated())],
+            migrations: migrations
+        )
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+
+        XCTAssertEqual(store.saved?.host.scheme, "https")
+        XCTAssertEqual(migrations.migrations.count, 1)
+        XCTAssertEqual(migrations.migrations.first?.from, previous)
+        XCTAssertEqual(migrations.migrations.first?.to.host.scheme, "https")
+    }
+
+    func testHTTPSURLValidatesDirectlyWithoutProbe() async {
+        let store = FakeAccountStore()
+        let (viewModel, spy) = makeViewModel(resultsByScheme: ["https": .success(authenticated())])
+
+        viewModel.urlText = "https://host.example.com:8443/get.php?username=user1&password=pass1"
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.scheme, "https")
+        XCTAssertEqual(spy.callCount, 1)
     }
 
     // MARK: - Success copy

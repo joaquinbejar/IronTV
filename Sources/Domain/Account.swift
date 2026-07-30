@@ -14,3 +14,8 @@ public struct Account: Equatable, Codable, Sendable {
         self.password = password
     }
 }
+
+public extension Account {
+    /// Whether panel traffic — credentials included — travels over TLS.
+    var usesSecureTransport: Bool { host.scheme?.lowercased() == "https" }
+}

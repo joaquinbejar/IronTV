@@ -16,7 +16,7 @@
 </head>
 <body>
 <h1>IronTV — Privacy Policy</h1>
-<p class="updated">Last updated: 17 July 2026</p>
+<p class="updated">Last updated: 30 July 2026</p>
 
 <p>IronTV ("the app") is a media player for Xtream Codes IPTV services. This
 policy explains what the app does and does not do with your information. In
@@ -43,10 +43,27 @@ app. We do not collect your name, email, location, device identifiers, usage
 statistics, or viewing activity.</p>
 
 <h2>Network connections</h2>
-<p>The app connects only to the IPTV server you enter. It does not contact any
-service operated by the developer. Any data transmitted over those connections
-goes directly between your device and your provider, and is governed by your
-provider's own privacy policy.</p>
+<p>The app never contacts any service operated by the developer. Depending on
+how you use it, it connects to:</p>
+<ul>
+  <li><strong>Your IPTV provider</strong> — the server you enter, for the
+      channel list, stream playback, and any channel icon or stream URL that
+      server hands out, which may point at your provider's own CDN hosts. This
+      traffic is governed by your provider's privacy policy. When your provider
+      only offers plain <code>http://</code>, the app asks for explicit
+      confirmation before sending your credentials, and prefers an HTTPS
+      endpoint whenever the same server answers on one.</li>
+  <li><strong>Sample-stream hosts</strong> — only while you use the built-in
+      sample mode (no account configured), the app plays public test streams
+      from Apple (<code>devstreaming-cdn.apple.com</code>), Mux
+      (<code>test-streams.mux.dev</code>) and Unified Streaming
+      (<code>demo.unified-streaming.com</code>). No account data exists in this
+      mode, and nothing about you is sent — these are plain video requests.</li>
+  <li><strong>Apple iCloud</strong> — optionally, your credentials sync through
+      your private iCloud Keychain and your preferences (favorites, last
+      channel, playback settings) through iCloud key-value storage, both under
+      your Apple ID on infrastructure operated by Apple, not by us.</li>
+</ul>
 
 <h2>Content</h2>
 <p>IronTV does not provide, host, or distribute any channels or content. It is a

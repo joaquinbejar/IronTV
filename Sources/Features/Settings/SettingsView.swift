@@ -95,6 +95,14 @@ struct AccountSettingsTab: View {
                 Section("Current account") {
                     LabeledContent("Server", value: account.host.absoluteString)
                     LabeledContent("Username", value: account.username)
+                    LabeledContent("Transport") {
+                        if account.usesSecureTransport {
+                            Label("HTTPS (encrypted)", systemImage: "lock.fill")
+                        } else {
+                            Label("HTTP (unencrypted)", systemImage: "lock.open")
+                                .foregroundStyle(.orange)
+                        }
+                    }
                     Button("Remove Account", role: .destructive) {
                         viewModel.removeAccount(from: appModel)
                     }
@@ -102,6 +110,16 @@ struct AccountSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .alert("This provider uses plain HTTP", isPresented: insecureConfirmationBinding) {
+            Button("Continue with HTTP") {
+                Task { await viewModel.confirmInsecureTransport(into: appModel) }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelInsecureTransport()
+            }
+        } message: {
+            Text("No HTTPS endpoint answered on this server. Over plain HTTP, anyone on the network path can read your username, password, and what you watch. Continue only if you accept that.")
+        }
         .onDisappear { viewModel.formDismissed() }
         .onChange(of: scenePhase) { _, phase in
             // Backgrounding can snapshot the window; don't leave a password
@@ -163,6 +181,21 @@ struct AccountSettingsTab: View {
         Task { await viewModel.validateAndSave(into: appModel) }
     }
 
+    /// Presents the insecure-transport alert while the view model waits for a
+    /// decision. A dismissal without a button (Esc, tap outside) only drops the
+    /// presentation — an in-flight Continue action can still consume the
+    /// pending confirmation.
+    private var insecureConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.phase == .confirmingInsecureTransport },
+            set: { presented in
+                if !presented {
+                    viewModel.insecureConfirmationDismissed()
+                }
+            }
+        )
+    }
+
     @ViewBuilder
     private var statusView: some View {
         switch viewModel.phase {
@@ -177,6 +210,10 @@ struct AccountSettingsTab: View {
                 #endif
                 Text("Validating…").foregroundStyle(.secondary)
             }
+        case .confirmingInsecureTransport:
+            // The alert carries the decision; the inline row just flags it.
+            Label("Awaiting HTTP confirmation", systemImage: "lock.open")
+                .foregroundStyle(.orange)
         case .success(let expiryDate):
             Label(successText(expiryDate: expiryDate), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
