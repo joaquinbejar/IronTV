@@ -18,7 +18,14 @@ extension UserDefaults: KeyValueStorage {}
 /// pushed to `NSUbiquitousKeyValueStore`, and remote changes are folded back
 /// in (remote wins). Without the iCloud KVS entitlement this degrades
 /// gracefully to plain UserDefaults — mirroring is simply inert.
-public final class SyncedStorage: KeyValueStorage {
+///
+/// Isolation model (`@unchecked Sendable` justification): every stored
+/// property is an immutable reference — `UserDefaults` and
+/// `NSUbiquitousKeyValueStore` are documented thread-safe, and the observer
+/// token lives in a locking ``TeardownBag``. The iCloud fold-in is serialized
+/// on the main queue, and `didChangeExternallyNotification` is always posted
+/// there.
+public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     public static let shared = SyncedStorage()
 
     /// Posted on the main queue after an iCloud-originated change has been
@@ -32,7 +39,7 @@ public final class SyncedStorage: KeyValueStorage {
     /// NSUbiquitousKeyValueStore without it logs "BUG IN CLIENT OF KVS"
     /// on every launch. Gated by the `IronTVCloudKVSEnabled` Info.plist flag.
     private let cloud: NSUbiquitousKeyValueStore?
-    private var observer: NSObjectProtocol?
+    private let teardown = TeardownBag()
 
     public convenience init(defaults: UserDefaults = .standard) {
         let enabled = Bundle.main.object(forInfoDictionaryKey: "IronTVCloudKVSEnabled") as? Bool ?? false
@@ -45,13 +52,13 @@ public final class SyncedStorage: KeyValueStorage {
 
         guard let cloud else { return }
 
-        observer = NotificationCenter.default.addObserver(
+        teardown.store(NotificationCenter.default.addObserver(
             forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
             object: cloud,
             queue: .main
         ) { [weak self] notification in
             self?.applyExternalChanges(notification)
-        }
+        })
 
         // Adopt whatever iCloud already has at startup (remote wins).
         cloud.synchronize()
@@ -115,9 +122,4 @@ public final class SyncedStorage: KeyValueStorage {
         )
     }
 
-    deinit {
-        if let observer {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
 }
