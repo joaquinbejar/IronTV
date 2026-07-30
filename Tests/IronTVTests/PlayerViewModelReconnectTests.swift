@@ -254,6 +254,21 @@ final class PlayerViewModelReconnectTests: XCTestCase {
         XCTAssertTrue(PlayerViewModel.geometryMateriallyChanged(from: CGSize(width: 100, height: 100), to: CGSize(width: 100, height: 300)))
     }
 
+    /// The review's initial-appearance scenario: reporting a size must never
+    /// count as a geometry change outside a VLC session, and the AV engine
+    /// never seeds a baseline.
+    @MainActor
+    func testSurfaceReportsOutsideVLCDoNotSeedTheGeometryBaseline() {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, _) = makePrimed(recorder: recorder, clock: clock)
+
+        viewModel.noteVideoSurfaceSize(CGSize(width: 800, height: 600))
+
+        XCTAssertNil(viewModel.lastGeometryRestartSize, "only a VLC session seeds the baseline")
+        XCTAssertEqual(viewModel.currentSurfaceSize, CGSize(width: 800, height: 600))
+    }
+
     @MainActor
     func testGeometryChangeOutsideVLCIsANoOp() async {
         let recorder = SleepRecorder()
