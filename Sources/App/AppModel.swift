@@ -7,9 +7,9 @@ import SwiftUI
 final class AppModel: ObservableObject {
     @Published private(set) var account: Account?
 
-    private let store: KeychainStore
+    private let store: AccountStoring
 
-    init(store: KeychainStore = KeychainStore()) {
+    init(store: AccountStoring = KeychainStore()) {
         self.store = store
         if DemoMode.isActive {
             self.account = DemoMode.account
