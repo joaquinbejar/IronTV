@@ -120,8 +120,8 @@ final class XtreamClientURLTests: XCTestCase {
 
             let encoded = components.percentEncodedPath.split(separator: "/", omittingEmptySubsequences: true)
             XCTAssertEqual(encoded.count, 4, "credential '\(username)'/'\(password)' must stay in exactly one segment each")
-            XCTAssertEqual(encoded.first, "live")
-            XCTAssertEqual(encoded.last, "1001.m3u8")
+            XCTAssertEqual(encoded.first.map(String.init), "live")
+            XCTAssertEqual(encoded.last.map(String.init), "1001.m3u8")
             // Byte preservation: decoding the segments recovers the raw values.
             XCTAssertEqual(String(encoded[1]).removingPercentEncoding, username)
             XCTAssertEqual(String(encoded[2]).removingPercentEncoding, password)
