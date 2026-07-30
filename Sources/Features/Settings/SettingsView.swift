@@ -258,8 +258,8 @@ struct PlaybackSettingsTab: View {
             }
 
             Section {
-                secondsStepper("Forward buffer", value: $model.settings.forwardBufferSeconds, in: 5...120, step: 5)
-                secondsStepper("Live delay (stall cushion)", value: $model.settings.liveEdgeOffsetSeconds, in: 0...60, step: 5)
+                secondsStepper("Forward buffer", value: $model.settings.forwardBufferSeconds, in: PlaybackSettings.forwardBufferRange, step: 5)
+                secondsStepper("Live delay (stall cushion)", value: $model.settings.liveEdgeOffsetSeconds, in: PlaybackSettings.liveEdgeOffsetRange, step: 5)
                 Toggle("Fast start (may stutter on weak connections)", isOn: $model.settings.fastStart)
             } header: {
                 Text("Buffering")
@@ -269,14 +269,14 @@ struct PlaybackSettingsTab: View {
             }
 
             Section("Auto-reconnect") {
-                secondsStepper("Reconnect after buffering for", value: $model.settings.waitingTimeoutSeconds, in: 2...60, step: 1)
-                secondsStepper("Reconnect after frozen video for", value: $model.settings.frozenTimeoutSeconds, in: 2...60, step: 1)
-                secondsStepper("Health check interval", value: $model.settings.watchdogIntervalSeconds, in: 1...10, step: 1)
-                intStepper("Max reconnect attempts", value: $model.settings.maxReconnectAttempts, in: 1...10)
+                secondsStepper("Reconnect after buffering for", value: $model.settings.waitingTimeoutSeconds, in: PlaybackSettings.waitingTimeoutRange, step: 1)
+                secondsStepper("Reconnect after frozen video for", value: $model.settings.frozenTimeoutSeconds, in: PlaybackSettings.frozenTimeoutRange, step: 1)
+                secondsStepper("Health check interval", value: $model.settings.watchdogIntervalSeconds, in: PlaybackSettings.watchdogIntervalRange, step: 1)
+                intStepper("Max reconnect attempts", value: $model.settings.maxReconnectAttempts, in: PlaybackSettings.maxReconnectAttemptsRange)
             }
 
             Section("Network") {
-                secondsStepper("API request timeout", value: $model.settings.apiTimeoutSeconds, in: 5...120, step: 5)
+                secondsStepper("API request timeout", value: $model.settings.apiTimeoutSeconds, in: PlaybackSettings.apiTimeoutRange, step: 5)
             }
 
             Section {

@@ -68,4 +68,45 @@ public struct PlaybackSettings: Equatable, Sendable {
         apiTimeoutSeconds: 30,
         preferredEngine: .auto
     )
+
+    // MARK: - Constraints
+
+    /// The single source of truth for valid ranges. The Settings UI derives
+    /// its steppers from these, and ``validated()`` clamps into them — so the
+    /// two can never drift apart, and no value outside them can reach a
+    /// Timer, CMTime, URLRequest timeout, or retry calculation.
+    public static let forwardBufferRange: ClosedRange<TimeInterval> = 5...120
+    public static let liveEdgeOffsetRange: ClosedRange<TimeInterval> = 0...60
+    public static let waitingTimeoutRange: ClosedRange<TimeInterval> = 2...60
+    public static let frozenTimeoutRange: ClosedRange<TimeInterval> = 2...60
+    /// Lower bound 1 guarantees the watchdog always makes progress — a zero
+    /// or negative interval would create a run-loop-hot repeating timer and
+    /// disable freeze detection.
+    public static let watchdogIntervalRange: ClosedRange<TimeInterval> = 1...10
+    public static let maxReconnectAttemptsRange: ClosedRange<Int> = 1...10
+    public static let apiTimeoutRange: ClosedRange<TimeInterval> = 5...120
+
+    /// Persisted values arrive from UserDefaults and iCloud KVS — other
+    /// devices, other app versions, or hand-edited plists. Every numeric
+    /// field is normalized: non-finite (NaN/±∞) falls back to the default,
+    /// anything else clamps into its documented range. The engine already
+    /// falls back at decode (`PlaybackEngineOption(rawValue:)`).
+    public func validated() -> PlaybackSettings {
+        PlaybackSettings(
+            forwardBufferSeconds: Self.normalize(forwardBufferSeconds, into: Self.forwardBufferRange, default: Self.default.forwardBufferSeconds),
+            liveEdgeOffsetSeconds: Self.normalize(liveEdgeOffsetSeconds, into: Self.liveEdgeOffsetRange, default: Self.default.liveEdgeOffsetSeconds),
+            waitingTimeoutSeconds: Self.normalize(waitingTimeoutSeconds, into: Self.waitingTimeoutRange, default: Self.default.waitingTimeoutSeconds),
+            frozenTimeoutSeconds: Self.normalize(frozenTimeoutSeconds, into: Self.frozenTimeoutRange, default: Self.default.frozenTimeoutSeconds),
+            maxReconnectAttempts: min(max(maxReconnectAttempts, Self.maxReconnectAttemptsRange.lowerBound), Self.maxReconnectAttemptsRange.upperBound),
+            watchdogIntervalSeconds: Self.normalize(watchdogIntervalSeconds, into: Self.watchdogIntervalRange, default: Self.default.watchdogIntervalSeconds),
+            fastStart: fastStart,
+            apiTimeoutSeconds: Self.normalize(apiTimeoutSeconds, into: Self.apiTimeoutRange, default: Self.default.apiTimeoutSeconds),
+            preferredEngine: preferredEngine
+        )
+    }
+
+    private static func normalize(_ value: TimeInterval, into range: ClosedRange<TimeInterval>, default fallback: TimeInterval) -> TimeInterval {
+        guard value.isFinite else { return fallback }
+        return min(max(value, range.lowerBound), range.upperBound)
+    }
 }
