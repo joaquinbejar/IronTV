@@ -35,6 +35,32 @@ public extension LiveStreamDTO {
     }
 }
 
+public extension AccountInfoDTO {
+    /// Authentication state comes from `user_info`, the advertised TLS port
+    /// from `server_info` — combined here so callers get one domain value. A
+    /// payload with no `user_info` is an unauthenticated status, port or not.
+    func toAccountStatus() -> AccountStatus {
+        let base = userInfo?.toDomain()
+            ?? AccountStatus(authenticated: false, status: nil, expiryDate: nil, maxConnections: nil)
+        return AccountStatus(
+            authenticated: base.authenticated,
+            status: base.status,
+            expiryDate: base.expiryDate,
+            maxConnections: base.maxConnections,
+            allowedOutputFormats: base.allowedOutputFormats,
+            advertisedHTTPSPort: Self.sanitizedHTTPSPort(serverInfo?.httpsPort)
+        )
+    }
+
+    /// Panels put anything in `https_port`: 0 when TLS is off, the plain http
+    /// port, negative or overflowing garbage. Only a valid TCP port survives;
+    /// everything else means "no advertised TLS endpoint".
+    private static func sanitizedHTTPSPort(_ raw: Int?) -> Int? {
+        guard let raw, (1...65535).contains(raw) else { return nil }
+        return raw
+    }
+}
+
 public extension UserInfoDTO {
     func toDomain() -> AccountStatus {
         AccountStatus(

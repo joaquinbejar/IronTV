@@ -119,4 +119,42 @@ final class DTOMappingTests: XCTestCase {
         XCTAssertEqual(pastStatus.expiryDate, Date(timeIntervalSince1970: 1_600_000_000))
         XCTAssertEqual(futureStatus.expiryDate, Date(timeIntervalSince1970: 1_803_727_680))
     }
+
+    // MARK: - Advertised HTTPS port
+
+    func testAccountStatusCarriesTheAdvertisedHTTPSPort() throws {
+        let int = try decodeFixture(AccountInfoDTO.self, from: "account_info_int").toAccountStatus()
+        let string = try decodeFixture(AccountInfoDTO.self, from: "account_info_string").toAccountStatus()
+
+        XCTAssertEqual(int.advertisedHTTPSPort, 8443)
+        XCTAssertEqual(string.advertisedHTTPSPort, 8443, "String-typed https_port must decode too")
+        XCTAssertTrue(int.authenticated, "user_info fields must survive the combined mapping")
+        XCTAssertEqual(int.allowedOutputFormats, [.hls, .ts])
+        XCTAssertEqual(int.expiryDate, Date(timeIntervalSince1970: 1_767_225_600))
+    }
+
+    func testInvalidAdvertisedHTTPSPortsMapToNil() throws {
+        let variants: [(label: String, json: String)] = [
+            ("zero", #"{"user_info": {"auth": 1}, "server_info": {"https_port": 0}}"#),
+            ("negative", #"{"user_info": {"auth": 1}, "server_info": {"https_port": -443}}"#),
+            ("out of range", #"{"user_info": {"auth": 1}, "server_info": {"https_port": 70000}}"#),
+            ("garbage string", #"{"user_info": {"auth": 1}, "server_info": {"https_port": "None"}}"#),
+            ("null", #"{"user_info": {"auth": 1}, "server_info": {"https_port": null}}"#),
+            ("absent", #"{"user_info": {"auth": 1}, "server_info": {}}"#),
+            ("no server_info", #"{"user_info": {"auth": 1}}"#),
+        ]
+        for (label, json) in variants {
+            let status = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(json.utf8)).toAccountStatus()
+            XCTAssertNil(status.advertisedHTTPSPort, "\(label) https_port must mean no advertised TLS endpoint")
+            XCTAssertTrue(status.authenticated, "\(label) https_port must not affect authentication")
+        }
+    }
+
+    func testMissingUserInfoMapsToUnauthenticatedStatus() throws {
+        let json = #"{"server_info": {"https_port": 8443}}"#
+        let status = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(json.utf8)).toAccountStatus()
+
+        XCTAssertFalse(status.authenticated, "no user_info can never authenticate, whatever server_info says")
+        XCTAssertEqual(status.advertisedHTTPSPort, 8443)
+    }
 }
