@@ -148,24 +148,24 @@ codesign --verify --deep --strict "$APP" \
 ENTITLEMENTS="$WORK/entitlements.plist"
 codesign -d --entitlements - --xml "$APP" > "$ENTITLEMENTS" 2>/dev/null \
     || die "Cannot read signed entitlements."
-plutil -convert xml1 "$ENTITLEMENTS"
-entitlement_is_true() {
-    /usr/bin/awk -v key="<key>$1</key>" \
-        'index($0, key) { getline; if (index($0, "<true/>")) found = 1 } END { exit !found }' \
-        "$ENTITLEMENTS"
+# PlistBuddy uses ':' as its path separator, so dotted entitlement keys are
+# plain keys to it — no fragile XML text parsing.
+entitlement() {
+    /usr/libexec/PlistBuddy -c "Print :$1" "$ENTITLEMENTS" 2>/dev/null
 }
-entitlement_is_true "com.apple.security.app-sandbox" \
-    || die "Signed entitlements missing app-sandbox=true (Mac App Store requirement)."
-entitlement_is_true "com.apple.security.network.client" \
+[[ "$(entitlement "com.apple.security.app-sandbox")" == "true" ]] \
+    || die "Signed entitlements missing app-sandbox=true (the app always runs sandboxed; also required for the Mac App Store build)."
+[[ "$(entitlement "com.apple.security.network.client")" == "true" ]] \
     || die "Signed entitlements missing network.client=true (IPTV connections would fail)."
-grep -q -F "com.taunais.irontv</string>" "$ENTITLEMENTS" \
+[[ "$(entitlement "keychain-access-groups:0")" == *"com.taunais.irontv" ]] \
     || die "Signed entitlements missing the com.taunais.irontv keychain access group."
-grep -q -F "<key>com.apple.developer.ubiquity-kvstore-identifier</key>" "$ENTITLEMENTS" \
+[[ -n "$(entitlement "com.apple.developer.ubiquity-kvstore-identifier")" ]] \
     || die "Signed entitlements missing the iCloud KVS identifier."
 
-# Note: no `grep -q` on the codesign pipe — with pipefail, an early exit
-# SIGPIPEs codesign and randomly fails the check.
-IDENTITY=$(codesign -dvv "$APP" 2>&1 | sed -n 's/^Authority=\(.*\)/\1/p' | head -1)
+# Note: awk consumes the whole codesign stream while printing only the first
+# Authority — an early-exiting reader (`head -1`, `grep -q`) would SIGPIPE
+# codesign under pipefail and randomly fail the check.
+IDENTITY=$(codesign -dvv "$APP" 2>&1 | awk '!found && sub(/^Authority=/, "") { found = 1; print }')
 WILL_NOTARIZE=false
 if [[ "$IDENTITY" == "Developer ID"* ]]; then
     WILL_NOTARIZE=true

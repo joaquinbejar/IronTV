@@ -87,7 +87,7 @@ Gatekeeper-verified. This needs Xcode signed in to the team's Apple Developer
 account (Xcode → Settings → Accounts) and a stored notary profile:
 
 ```bash
-xcrun notarytool store-credentials irontv-notary --apple-id <apple-id> --team-id <team-id>
+xcrun notarytool store-credentials irontv-notary --apple-id <apple-id> --team-id 5NP3LPSUMR
 ```
 
 For a local, un-notarized build (installs with a quarantine workaround
