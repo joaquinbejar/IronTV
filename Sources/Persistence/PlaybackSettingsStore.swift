@@ -37,7 +37,7 @@ public struct PlaybackSettingsStore {
             liveEdgeOffsetSeconds: double(Key.liveEdgeOffset) ?? fallback.liveEdgeOffsetSeconds,
             waitingTimeoutSeconds: double(Key.waitingTimeout) ?? fallback.waitingTimeoutSeconds,
             frozenTimeoutSeconds: double(Key.frozenTimeout) ?? fallback.frozenTimeoutSeconds,
-            maxReconnectAttempts: (storage.object(forKey: Key.maxReconnects) as? Int) ?? fallback.maxReconnectAttempts,
+            maxReconnectAttempts: (storage.object(forKey: Key.maxReconnects) as? NSNumber)?.intValue ?? fallback.maxReconnectAttempts,
             watchdogIntervalSeconds: double(Key.watchdogInterval) ?? fallback.watchdogIntervalSeconds,
             fastStart: (storage.object(forKey: Key.fastStart) as? Bool) ?? fallback.fastStart,
             apiTimeoutSeconds: double(Key.apiTimeout) ?? fallback.apiTimeoutSeconds,
@@ -64,7 +64,10 @@ public struct PlaybackSettingsStore {
             .forEach(storage.removeObject(forKey:))
     }
 
+    /// NSNumber-based coercion: legacy versions, other platforms, or iCloud
+    /// can store an Int where we expect a Double (and vice versa) — those
+    /// values must load and clamp, not silently reset to defaults.
     private func double(_ key: String) -> Double? {
-        storage.object(forKey: key) as? Double
+        (storage.object(forKey: key) as? NSNumber)?.doubleValue
     }
 }

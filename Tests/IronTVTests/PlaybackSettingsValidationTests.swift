@@ -89,6 +89,18 @@ final class PlaybackSettingsValidationTests: XCTestCase {
         XCTAssertEqual(load().maxReconnectAttempts, PlaybackSettings.maxReconnectAttemptsRange.upperBound)
     }
 
+    func testCrossTypedNumericValuesCoerceInsteadOfResetting() {
+        // Int stored where a Double is expected, and the reverse — legacy or
+        // hand-edited defaults must load and clamp, not reset to defaults.
+        defaults.set(40, forKey: "playback.forwardBufferSeconds")
+        defaults.set(7.0, forKey: "playback.maxReconnectAttempts")
+
+        let settings = load()
+
+        XCTAssertEqual(settings.forwardBufferSeconds, 40)
+        XCTAssertEqual(settings.maxReconnectAttempts, 7)
+    }
+
     func testTheDefaultsThemselvesAreWithinTheConstraints() {
         assertWithinConstraints(PlaybackSettings.default.validated(), "defaults")
         XCTAssertEqual(PlaybackSettings.default.validated(), PlaybackSettings.default, "defaults must survive validation unchanged")
