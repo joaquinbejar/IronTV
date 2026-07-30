@@ -80,11 +80,15 @@ jobs:
   strict-concurrency:
     name: Strict concurrency
     runs-on: macos-15
-    # Hard gate since #17 landed the zero-warning baseline: project sources —
-    # tests included (build-for-testing) — must produce no warnings under
-    # complete checking, because they become errors in the Swift 6 language
-    # mode (#38). Only warnings in files under this repo count; SDK and
-    # dependency noise does not fail the job.
+    # Since #38 the project builds in the Swift 6 language mode, where
+    # isolation violations are compile errors — the macOS build & test job
+    # above would already fail on them. This job stays as the zero-warning
+    # witness over the test sources too (build-for-testing): any warning in
+    # a file under this repo fails it, so deprecations and new-toolchain
+    # diagnostics can't accumulate silently. SDK and dependency noise does
+    # not count. The explicit SWIFT_STRICT_CONCURRENCY=complete is redundant
+    # in Swift 6 mode but harmless, and keeps the job meaningful if
+    # SWIFT_VERSION is ever rolled back.
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/prepare-project
