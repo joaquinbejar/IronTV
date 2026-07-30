@@ -16,12 +16,19 @@ import Foundation
 public struct AccountIdentity: Hashable, Sendable, CustomStringConvertible {
     /// Preference-key namespace: panel host and username, no secret.
     public let namespace: String
+    /// Compact, privacy-preserving namespace for preference keys: a versioned
+    /// digest of host + username, so UserDefaults/iCloud key names carry no
+    /// account metadata. Excludes the password deliberately — a rotation must
+    /// keep favorites and the last channel. The `v1.` prefix versions the
+    /// derivation so it can evolve behind a migration.
+    public let storageNamespace: String
     /// Short digest that changes when any credential changes, the password
     /// included. Not reversible, and not itself a secret.
     public let fingerprint: String
 
     public init(host: URL, username: String, password: String) {
         self.namespace = "\(host.absoluteString).\(username)"
+        self.storageNamespace = "v1." + Self.digest("\(host.absoluteString)\u{0}\(username)")
         self.fingerprint = Self.fingerprint(host: host, username: username, password: password)
     }
 
@@ -33,9 +40,12 @@ public struct AccountIdentity: Hashable, Sendable, CustomStringConvertible {
     /// to read in a log line.
     private static func fingerprint(host: URL, username: String, password: String) -> String {
         // NUL-separated so ("ab", "c") and ("a", "bc") can't hash alike.
-        let material = "\(host.absoluteString)\u{0}\(username)\u{0}\(password)"
-        let digest = SHA256.hash(data: Data(material.utf8))
-        return digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        digest("\(host.absoluteString)\u{0}\(username)\u{0}\(password)")
+    }
+
+    private static func digest(_ material: String) -> String {
+        SHA256.hash(data: Data(material.utf8))
+            .prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Safe to log: namespace plus fingerprint, never the password.

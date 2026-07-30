@@ -100,6 +100,22 @@ final class LastChannelStoreTests: XCTestCase {
         XCTAssertEqual(rotatedStore.lastStreamID, StreamID(99))
     }
 
+    // MARK: - Migration off the plaintext-namespace keys
+
+    /// Selections shipped under `key.host.username` scoped keys must survive
+    /// the move to the digest namespace, and the plaintext keys must vanish.
+    func testPlaintextNamespaceKeysMigrateToTheDigestNamespace() {
+        defaults.set(12, forKey: "lastCategoryID.http://host.example.com:8080.user1")
+        defaults.set(99, forKey: "lastStreamID.http://host.example.com:8080.user1")
+
+        let store = makeStore(for: account)
+
+        XCTAssertEqual(store.lastCategory, .category(CategoryID(12)))
+        XCTAssertEqual(store.lastStreamID, StreamID(99))
+        XCTAssertNil(defaults.object(forKey: "lastCategoryID.http://host.example.com:8080.user1"))
+        XCTAssertNil(defaults.object(forKey: "lastStreamID.http://host.example.com:8080.user1"))
+    }
+
     // MARK: - Migration off the pre-scoping global keys
 
     private func seedLegacyValues(category: Int, stream: Int) {

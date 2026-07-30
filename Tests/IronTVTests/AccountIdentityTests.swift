@@ -77,4 +77,27 @@ final class AccountIdentityTests: XCTestCase {
     func testNamespaceIsHostAndUsernameOnly() {
         XCTAssertEqual(account.identity.namespace, "http://host.example.com:8080.user1")
     }
+
+    // MARK: - Storage namespace (digest)
+
+    func testStorageNamespaceSurvivesAPasswordRotation() {
+        let rotated = Account(host: account.host, username: account.username, password: "rotated")
+        XCTAssertEqual(account.identity.storageNamespace, rotated.identity.storageNamespace)
+    }
+
+    func testStorageNamespaceDiffersPerAccount() {
+        let other = Account(host: account.host, username: "user2", password: account.password)
+        XCTAssertNotEqual(account.identity.storageNamespace, other.identity.storageNamespace)
+    }
+
+    /// The whole point of the digest: no account metadata in key names.
+    func testStorageNamespaceCarriesNoAccountMetadata() {
+        let namespace = account.identity.storageNamespace
+        XCTAssertTrue(namespace.hasPrefix("v1."))
+        XCTAssertFalse(namespace.contains("host.example.com"))
+        XCTAssertFalse(namespace.contains("user1"))
+        XCTAssertFalse(namespace.contains(account.password))
+        XCTAssertEqual(namespace.dropFirst(3).count, 16)
+        XCTAssertTrue(namespace.dropFirst(3).allSatisfy(\.isHexDigit))
+    }
 }

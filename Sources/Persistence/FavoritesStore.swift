@@ -10,10 +10,11 @@ public struct FavoritesStore {
 
     public init(account: Account, storage: KeyValueStorage = SyncedStorage.shared) {
         self.storage = storage
-        // Same namespace the rest of the preference stores use. It resolves to
-        // the key shipped before AccountIdentity existed, so favorites already
-        // synced to iCloud keep loading — see FavoritesStoreTests.
-        self.storageKey = "favorites.\(account.identity.namespace)"
+        // Digest namespace: no host/username in key names. Values stored under
+        // the plaintext key shipped by earlier versions keep loading via the
+        // migration below — see FavoritesStoreTests.
+        self.storageKey = "favorites.\(account.identity.storageNamespace)"
+        PreferenceKeyMigration.migrate("favorites.\(account.identity.namespace)", to: storageKey, in: storage)
     }
 
     public func load() -> Set<StreamID> {
