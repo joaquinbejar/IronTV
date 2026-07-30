@@ -170,6 +170,31 @@ final class PlayerViewModelReconnectTests: XCTestCase {
         XCTAssertEqual(attempts().count, 2)
     }
 
+    /// The review's recovery-before-delay scenario: playback becomes healthy
+    /// while a scheduled retry is still sleeping — the retry must die, not
+    /// restart a healthy stream (its generation is still valid, so only an
+    /// explicit cancel can stop it).
+    @MainActor
+    func testHealthyRecoveryBeforeTheDelayKillsThePendingRetry() async {
+        let recorder = SleepRecorder()
+        let clock = TestClock()
+        let (viewModel, attempts) = makePrimed(recorder: recorder, clock: clock)
+
+        viewModel.reconnect()
+        viewModel.reconnect()
+        viewModel.reconnect() // suppressed → schedules the backoff retry
+        await Task.yield()
+
+        viewModel.noteHealthyPlayback() // the stream recovered on its own
+
+        clock.advance(60)
+        await recorder.release()
+        for _ in 0..<20 { await Task.yield() }
+
+        XCTAssertEqual(attempts().count, 2, "the pending retry must not restart a healthy stream")
+        XCTAssertEqual(viewModel.reconnectAttempts, 0, "healthy progress resets the budget")
+    }
+
     // MARK: - URL identity
 
     @MainActor

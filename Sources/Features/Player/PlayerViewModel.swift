@@ -151,6 +151,7 @@ final class PlayerViewModel: ObservableObject {
                 case .playing:
                     self.state = .playing
                     self.waitingSince = nil
+                    self.noteHealthyPlayback()
                 case .waitingToPlayAtSpecifiedRate:
                     if self.waitingSince == nil {
                         self.waitingSince = Date()
@@ -389,7 +390,7 @@ final class PlayerViewModel: ObservableObject {
             if clockAdvanced && videoHealthy {
                 frozenSeconds = 0
                 waitingSince = nil
-                reconnectAttempts = 0 // healthy again; reset the budget
+                noteHealthyPlayback() // healthy again: reset budget, kill pending retry
                 attemptedSeekRecovery = false
                 if state == .buffering || state == .loading || state == .reconnecting {
                     state = .playing // healthy: clear any stale overlay
@@ -552,6 +553,16 @@ final class PlayerViewModel: ObservableObject {
         reconnectRetryTask = nil
     }
 
+    /// Healthy progress observed (frames flowing, or the player reports
+    /// playing): the recovery history resets AND any pending scheduled retry
+    /// dies — a stream that recovered before its backoff delay expired must
+    /// not be restarted by the sleeping task (its generation is still valid).
+    func noteHealthyPlayback() {
+        cancelScheduledRetry()
+        reconnectAttempts = 0
+        lastReconnectAt = nil
+    }
+
     /// AVPlayer item failed: codec problems fall back to the VLC engine
     /// (which decodes MP2/interlaced via FFmpeg); anything else goes through
     /// the normal reconnect budget.
@@ -665,6 +676,7 @@ final class PlayerViewModel: ObservableObject {
             break
         case .playing, .esAdded:
             state = .playing
+            noteHealthyPlayback()
         case .paused:
             break // user pause via future controls; don't fight it
         case .error:
@@ -696,8 +708,7 @@ final class PlayerViewModel: ObservableObject {
         guard engine == .vlc, state != .playing else { return }
         if case .failed = state { return }
         state = .playing
-        reconnectAttempts = 0
-        lastReconnectAt = nil
+        noteHealthyPlayback()
     }
     #endif
 }
