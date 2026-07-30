@@ -10,7 +10,10 @@ public struct FavoritesStore {
 
     public init(account: Account, storage: KeyValueStorage = SyncedStorage.shared) {
         self.storage = storage
-        self.storageKey = "favorites.\(account.host.absoluteString).\(account.username)"
+        // Same namespace the rest of the preference stores use. It resolves to
+        // the key shipped before AccountIdentity existed, so favorites already
+        // synced to iCloud keep loading — see FavoritesStoreTests.
+        self.storageKey = "favorites.\(account.identity.namespace)"
     }
 
     public func load() -> Set<StreamID> {

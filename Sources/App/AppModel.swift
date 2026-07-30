@@ -16,6 +16,11 @@ final class AppModel: ObservableObject {
         } else {
             self.account = (try? store.loadAccount()) ?? nil
         }
+        if account == nil {
+            // Nothing to migrate the pre-scoping last-channel keys into, so drop
+            // them rather than let the next account inherit them.
+            LastChannelStore.discardLegacyValues()
+        }
     }
 
     func saveAccount(_ account: Account) throws {
