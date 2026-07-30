@@ -94,4 +94,85 @@ final class XtreamClientURLTests: XCTestCase {
         let url = URL(string: "http://cdn.example.com/logos/news1.png")!
         XCTAssertEqual(CredentialRedactor.redact(url), url.absoluteString)
     }
+
+    // MARK: - Hostile credentials
+
+    /// Provider-issued credentials seen in the wild: slashes, percents, spaces,
+    /// Unicode, URL metacharacters. Each pair must survive path encoding
+    /// byte-exactly and never appear in a redacted URL.
+    private let hostileCredentials: [(username: String, password: String)] = [
+        ("us/er", "topsecret"),
+        ("user", "top/secret/x"),
+        ("100%legit", "50%off%2F"),
+        ("us er", "top secret"),
+        ("üser日本", "pässwörd中文"),
+        ("what?user", "why?pass"),
+        ("hash#user", "pass#tag"),
+        ("user@host", "p@ss@"),
+        ("a&b+c", "d&e+f"),
+    ]
+
+    func testPlaybackURLEncodesEachCredentialAsOneSegment() throws {
+        for (username, password) in hostileCredentials {
+            let account = Account(host: URL(string: "http://host.example.com:8080")!, username: username, password: password)
+            let url = try XtreamClient(account: account).playbackURL(for: StreamID(1001))
+            let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+
+            let encoded = components.percentEncodedPath.split(separator: "/", omittingEmptySubsequences: true)
+            XCTAssertEqual(encoded.count, 4, "credential '\(username)'/'\(password)' must stay in exactly one segment each")
+            XCTAssertEqual(encoded.first, "live")
+            XCTAssertEqual(encoded.last, "1001.m3u8")
+            // Byte preservation: decoding the segments recovers the raw values.
+            XCTAssertEqual(String(encoded[1]).removingPercentEncoding, username)
+            XCTAssertEqual(String(encoded[2]).removingPercentEncoding, password)
+        }
+    }
+
+    func testPlaybackURLPreservesProviderBytesFromM3UQuery() throws {
+        let account = try M3UURLParser.parse(
+            "http://host.example.com:8080/get.php?username=us%2Fer1&password=top%20secret%25&type=m3u_plus"
+        )
+        XCTAssertEqual(account.username, "us/er1")
+        XCTAssertEqual(account.password, "top secret%")
+
+        let url = try XtreamClient(account: account).playbackURL(for: StreamID(7))
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let encoded = components.percentEncodedPath.split(separator: "/", omittingEmptySubsequences: true)
+
+        XCTAssertEqual(String(encoded[1]).removingPercentEncoding, "us/er1")
+        XCTAssertEqual(String(encoded[2]).removingPercentEncoding, "top secret%")
+    }
+
+    func testRedactionNeverLeaksHostileCredentials() throws {
+        for (username, password) in hostileCredentials {
+            let account = Account(host: URL(string: "http://host.example.com:8080")!, username: username, password: password)
+            let url = try XtreamClient(account: account).playbackURL(for: StreamID(1001))
+            let redacted = CredentialRedactor.redact(url)
+
+            XCTAssertFalse(redacted.contains(username), "raw username '\(username)' leaked into \(redacted)")
+            XCTAssertFalse(redacted.contains(password), "raw password leaked for user '\(username)'")
+            XCTAssertEqual(redacted, "http://host.example.com:8080/live/REDACTED/REDACTED/1001.m3u8")
+        }
+    }
+
+    func testRedactionMasksLegacyURLsWithDecodedSlashCredentials() throws {
+        // Shape the previous URL builder produced for username "us/er": the
+        // password landed beyond segment 2 and used to survive redaction.
+        let url = try XCTUnwrap(URL(string: "http://host.example.com/live/us/er/topsecret/1001.m3u8"))
+        let redacted = CredentialRedactor.redact(url)
+
+        XCTAssertFalse(redacted.contains("topsecret"))
+        XCTAssertEqual(redacted, "http://host.example.com/live/REDACTED/REDACTED/1001.m3u8")
+    }
+
+    func testPlaybackURLRejectsEmptyCredentials() {
+        for (username, password) in [("", "pass"), ("user", ""), ("", "")] {
+            let account = Account(host: URL(string: "http://host.example.com")!, username: username, password: password)
+            XCTAssertThrowsError(try XtreamClient(account: account).playbackURL(for: StreamID(1))) { error in
+                guard case XtreamAPIError.invalidURL = error else {
+                    return XCTFail("expected invalidURL, got \(error)")
+                }
+            }
+        }
+    }
 }

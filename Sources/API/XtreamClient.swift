@@ -46,13 +46,30 @@ public struct XtreamClient: Sendable {
         case ts = "ts"
     }
 
+    /// Everything legal inside a single path segment. `urlPathAllowed` keeps
+    /// `/` as a separator, so a credential containing one would split into
+    /// extra segments and hit the wrong Xtream route — encode it as `%2F`.
+    private static let pathSegmentAllowed: CharacterSet = {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        return allowed
+    }()
+
     /// Playback URL: `{host}/live/{username}/{password}/{stream_id}.{ext}`.
+    /// Credentials are percent-encoded per segment, so the panel receives the
+    /// exact bytes the provider issued, whatever characters they contain.
     /// Never log the result unredacted — see `CredentialRedactor`.
     public func playbackURL(for streamID: StreamID, format: StreamFormat = .hls) throws -> URL {
         guard var components = URLComponents(url: account.host, resolvingAgainstBaseURL: false) else {
             throw XtreamAPIError.invalidURL
         }
-        components.path = "/live/\(account.username)/\(account.password)/\(streamID.rawValue).\(format.rawValue)"
+        guard !account.username.isEmpty, !account.password.isEmpty,
+              let username = account.username.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed),
+              let password = account.password.addingPercentEncoding(withAllowedCharacters: Self.pathSegmentAllowed)
+        else {
+            throw XtreamAPIError.invalidURL
+        }
+        components.percentEncodedPath = "/live/\(username)/\(password)/\(streamID.rawValue).\(format.rawValue)"
         guard let url = components.url else {
             throw XtreamAPIError.invalidURL
         }
