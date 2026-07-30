@@ -127,6 +127,14 @@ final class ChannelsViewModelTests: XCTestCase {
         }
     }
 
+    /// Portable weak holder: `weak let` needs a newer toolchain than CI's,
+    /// and a local `weak var` that is never mutated warns — a class property
+    /// does neither.
+    private final class WeakRef<T: AnyObject> {
+        private(set) weak var value: T?
+        init(_ value: T?) { self.value = value }
+    }
+
     private static func stream(_ id: Int) -> LiveStream {
         LiveStream(id: StreamID(id), name: "S\(id)", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
     }
@@ -303,11 +311,11 @@ final class ChannelsViewModelTests: XCTestCase {
         viewModel?.selectedCategory = .category(CategoryID(1))
         await browser.waitUntilStreamRequests(1) // provider work genuinely started
 
-        weak let released = viewModel
+        let released = WeakRef(viewModel)
         viewModel = nil
         await settle()
 
-        XCTAssertNil(released, "an in-flight load must not keep the view model alive")
+        XCTAssertNil(released.value, "an in-flight load must not keep the view model alive")
         // The gate reacts to cancellation: the fetch must have stopped, not
         // merely been abandoned.
         for _ in 0..<50 {
