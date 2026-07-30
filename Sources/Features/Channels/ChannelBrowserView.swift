@@ -36,14 +36,17 @@ struct ChannelBrowserView: View {
                 // tvOS navigates by pushing screens; playback starts there.
                 #if !os(tvOS)
                 guard let streamID, let stream = channels.selectedStream() else { return }
-                do {
-                    player.play(
-                        stream,
-                        url: try channels.playbackURL(for: streamID),
-                        tsURL: channels.playbackTSURL(for: streamID)
-                    )
-                } catch {
-                    player.fail(error)
+                Task {
+                    do {
+                        let plan = try await channels.playbackPlan(for: streamID)
+                        // The plan may have awaited the capabilities fetch —
+                        // only the still-current selection may start playback.
+                        guard channels.selectedStreamID == streamID else { return }
+                        player.play(stream, url: plan.primaryURL, tsURL: plan.tsURL, hlsAvailable: plan.hlsAvailable)
+                    } catch {
+                        guard channels.selectedStreamID == streamID else { return }
+                        player.fail(error)
+                    }
                 }
                 #endif
             }

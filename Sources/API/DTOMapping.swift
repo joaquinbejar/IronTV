@@ -19,12 +19,18 @@ public extension LiveStreamDTO {
         let iconURL = streamIcon
             .flatMap { $0.isEmpty ? nil : URL(string: $0) }
             .flatMap { $0.scheme == nil ? nil : $0 }
+        // direct_source survives only as a well-formed absolute URL; the trust
+        // policy (scheme + panel host) is applied by PlaybackSourcePlanner.
+        let directSourceURL = directSource
+            .flatMap { $0.isEmpty ? nil : URL(string: $0) }
+            .flatMap { $0.scheme == nil ? nil : $0 }
         return LiveStream(
             id: StreamID(id),
             name: name,
             iconURL: iconURL,
             categoryID: categoryID,
-            epgChannelID: epgChannelId
+            epgChannelID: epgChannelId,
+            directSourceURL: directSourceURL
         )
     }
 }
@@ -35,7 +41,8 @@ public extension UserInfoDTO {
             authenticated: auth == 1,
             status: status,
             expiryDate: Self.sanitizedExpiryDate(expDate),
-            maxConnections: maxConnections
+            maxConnections: maxConnections,
+            allowedOutputFormats: Self.outputFormats(from: allowedOutputFormats)
         )
     }
 
@@ -45,6 +52,15 @@ public extension UserInfoDTO {
     /// timestamps) — map to `nil`, meaning no known expiry. Plausible *past*
     /// timestamps survive, so a genuinely expired account stays distinguishable
     /// from a never-expiring one.
+    /// Normalizes the panel's advertised formats: lowercased, unknown strings
+    /// ignored. An absent field maps to nil (callers assume both classic
+    /// formats); a present-but-unrecognizable list maps to an empty set — the
+    /// panel said something, and it wasn't a format we can play.
+    private static func outputFormats(from raw: [String]?) -> Set<StreamOutputFormat>? {
+        guard let raw else { return nil }
+        return Set(raw.compactMap { StreamOutputFormat(rawValue: $0.lowercased()) })
+    }
+
     private static func sanitizedExpiryDate(_ raw: Int?) -> Date? {
         let plausibleUnixSeconds = 946_684_800...4_102_444_800
         guard let raw, plausibleUnixSeconds.contains(raw) else { return nil }

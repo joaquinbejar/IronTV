@@ -128,6 +128,9 @@ final class PlayerViewModel: ObservableObject {
     private var lastReconnectAt: Date?
     /// Raw MPEG-TS variant of the current stream, for the VLC engine.
     private(set) var currentTSURL: URL?
+    /// Whether the panel advertises HLS for the current stream — retry() must
+    /// preserve it, or a TS-only channel would retry into AVPlayer.
+    private(set) var currentHLSAvailable = true
     /// Timestamps of recent AVPlayer stall recoveries. A channel needing
     /// several within a short window plays badly over the panel's HLS — the
     /// cure is the raw TS stream through VLC, which is what other IPTV
@@ -173,17 +176,20 @@ final class PlayerViewModel: ObservableObject {
     /// look like AppleCoreMedia, which is exactly AVPlayer's default.
     /// `tsURL` is the raw MPEG-TS variant the VLC engine prefers (nil for
     /// demo/sample content).
-    func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil) {
+    /// `hlsAvailable: false` means the panel advertises no HLS for this
+    /// stream — skip the AVPlayer attempt and lead with the VLC engine.
+    func play(_ stream: LiveStream, url: URL, tsURL: URL? = nil, hlsAvailable: Bool = true) {
         cancelScheduledRetry()
         reconnectAttempts = 0
         lastReconnectAt = nil
         stallRecoveryEvents = []
         currentTSURL = tsURL
+        currentHLSAvailable = hlsAvailable
         settings = settingsStore.load()
         #if canImport(VLCKitSPM)
         // Forced-VLC preference, or a channel this session already learned
         // needs VLC — skip the AVPlayer attempt entirely.
-        let forceVLC = settings.preferredEngine == .vlc && !DemoMode.isActive
+        let forceVLC = (settings.preferredEngine == .vlc && !DemoMode.isActive) || !hlsAvailable
         if forceVLC || vlcOnlyStreams.contains(stream.id) {
             currentStream = stream
             currentURL = url
@@ -196,7 +202,7 @@ final class PlayerViewModel: ObservableObject {
 
     func retry() {
         guard let currentStream, let currentURL else { return }
-        play(currentStream, url: currentURL, tsURL: currentTSURL)
+        play(currentStream, url: currentURL, tsURL: currentTSURL, hlsAvailable: currentHLSAvailable)
     }
 
     /// URL the VLC engine should use: raw TS when the panel offers it.
@@ -234,6 +240,7 @@ final class PlayerViewModel: ObservableObject {
         currentStream = nil
         currentURL = nil
         currentTSURL = nil
+        currentHLSAvailable = true
         stallRecoveryEvents = []
         // A later retry()/play() must start from a clean recovery history —
         // stale attempt counts would inherit the previous stream's backoff.

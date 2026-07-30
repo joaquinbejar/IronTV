@@ -39,6 +39,7 @@ final class ChannelsViewModel: ObservableObject {
     @Published private(set) var favorites: Set<StreamID>
 
     private let client: ChannelBrowsing
+    private let panelHost: URL
     private let lastChannel: LastChannelStore
     private let favoritesStore: FavoritesStore
     /// Main-actor-confined, like every other piece of this view model's state:
@@ -53,6 +54,12 @@ final class ChannelsViewModel: ObservableObject {
     /// cancel them.
     private var categoriesTask: Task<Void, Never>?
     private var streamsTask: Task<Void, Never>?
+    /// Resolves to the formats the panel advertises (nil when the panel
+    /// doesn't say, or the fetch failed — both classic formats are assumed
+    /// then). Pending is modeled by the task itself: `playbackPlan` awaits it,
+    /// so a selection made before capabilities arrive can never plan against
+    /// the wrong assumption. nil task = demo mode (no fetch).
+    private var capabilitiesTask: Task<Set<StreamOutputFormat>?, Never>?
     /// Single in-flight fetch of the full channel list — All and Favorites
     /// dedupe on it instead of issuing a second identical request.
     private var allStreamsTask: Task<[LiveStream], Error>?
@@ -76,18 +83,38 @@ final class ChannelsViewModel: ObservableObject {
     ) {
         let settings = PlaybackSettingsStore().load()
         self.client = client ?? XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
+        self.panelHost = account.host
         self.lastChannel = lastChannel ?? LastChannelStore(identity: account.identity, storage: preferenceStorage)
         self.favoritesStore = FavoritesStore(account: account, storage: preferenceStorage)
         self.isDemo = DemoMode.isActive || account == DemoMode.account
         self.favorites = isDemo ? DemoMode.favoriteIDs : favoritesStore.load()
         observeFavoritesSync()
         categoriesTask = makeCategoriesLoadTask()
+        if !isDemo {
+            capabilitiesTask = Task { [weak self] () -> Set<StreamOutputFormat>? in
+                guard let fetch = self?.makeCapabilitiesFetch() else { return nil }
+                let status = try? await withTaskCancellationHandler {
+                    try await fetch.value
+                } onCancel: {
+                    fetch.cancel()
+                }
+                return status?.allowedOutputFormats
+            }
+        }
     }
 
     deinit {
         categoriesTask?.cancel()
         streamsTask?.cancel()
         allStreamsTask?.cancel()
+        capabilitiesTask?.cancel()
+    }
+
+    /// Detached like every other fetch: the wrapper must not pin the view
+    /// model while the request is in flight.
+    private func makeCapabilitiesFetch() -> Task<AccountStatus, Error> {
+        let client = self.client
+        return Task.detached { try await client.accountStatus() }
     }
 
     /// Picks up favorites toggled on another device while this screen is open.
@@ -157,6 +184,58 @@ final class ChannelsViewModel: ObservableObject {
             return DemoMode.isActive ? DemoMode.screenshotClipURL : DemoMode.sampleURL(for: streamID)
         }
         return try client.playbackURL(for: streamID)
+    }
+
+    /// What the player should be handed for one stream, honoring what the
+    /// panel advertises.
+    struct PlaybackPlan: Equatable {
+        let primaryURL: URL
+        let tsURL: URL?
+        /// false = the panel advertises no HLS; the player leads with VLC.
+        let hlsAvailable: Bool
+    }
+
+    /// Deterministic source selection: HLS when advertised, TS when
+    /// advertised (also the VLC fallback), a trusted same-origin direct
+    /// source last. Awaits the capabilities fetch, so a channel selected
+    /// before the panel answered still plans against what it actually
+    /// advertises — a TS-only panel never gets a doomed AVPlayer attempt.
+    /// A panel advertising nothing playable surfaces a typed error.
+    func playbackPlan(for streamID: StreamID) async throws -> PlaybackPlan {
+        if isDemo {
+            return PlaybackPlan(primaryURL: try playbackURL(for: streamID), tsURL: nil, hlsAvailable: true)
+        }
+        let allowedFormats = await capabilitiesTask?.value ?? nil
+        let stream = streams.first { $0.id == streamID } ?? streamCache[.all]?.first { $0.id == streamID }
+        let selection = PlaybackSourcePlanner.plan(
+            directSource: stream?.directSourceURL,
+            allowedFormats: allowedFormats,
+            panelHost: panelHost
+        )
+        let hls = selection.useHLS ? try client.playbackURL(for: streamID, format: .hls) : nil
+        let ts: URL?
+        if selection.useTS {
+            // As the optional alternative next to HLS a failure is tolerable;
+            // as the PRIMARY route (TS-only panel) it must surface instead of
+            // being misdiagnosed as "nothing playable".
+            ts = selection.useHLS
+                ? try? client.playbackURL(for: streamID, format: .ts)
+                : try client.playbackURL(for: streamID, format: .ts)
+        } else {
+            ts = nil
+        }
+        if let hls {
+            return PlaybackPlan(primaryURL: hls, tsURL: ts, hlsAvailable: true)
+        }
+        if let ts {
+            return PlaybackPlan(primaryURL: ts, tsURL: ts, hlsAvailable: false)
+        }
+        if let direct = selection.directURL {
+            // Trusted same-host direct URL: container unknown, so AVPlayer
+            // leads and the usual codec fallback applies.
+            return PlaybackPlan(primaryURL: direct, tsURL: nil, hlsAvailable: true)
+        }
+        throw PlaybackError.noPlayableSource
     }
 
     /// Raw MPEG-TS variant for the VLC engine; nil for demo/sample content.

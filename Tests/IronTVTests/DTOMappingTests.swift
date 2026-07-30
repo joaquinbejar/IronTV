@@ -41,6 +41,33 @@ final class DTOMappingTests: XCTestCase {
         XCTAssertEqual(stream.categoryID, CategoryID(9))
     }
 
+    func testDirectSourceMapsOnlyWellFormedAbsoluteURLs() throws {
+        let json = #"""
+        [{"stream_id": 1, "name": "A", "category_id": 7, "direct_source": "http://host.example.com/d/1.m3u8"},
+         {"stream_id": 2, "name": "B", "category_id": 7, "direct_source": ""},
+         {"stream_id": 3, "name": "C", "category_id": 7, "direct_source": "/relative/only"},
+         {"stream_id": 4, "name": "D", "category_id": 7}]
+        """#
+        let dtos = try JSONDecoder().decode([LiveStreamDTO].self, from: Data(json.utf8))
+        let streams = dtos.compactMap { $0.toDomain() }
+
+        XCTAssertEqual(streams[0].directSourceURL, URL(string: "http://host.example.com/d/1.m3u8"))
+        XCTAssertNil(streams[1].directSourceURL, "empty direct_source maps to nil")
+        XCTAssertNil(streams[2].directSourceURL, "scheme-less direct_source maps to nil")
+        XCTAssertNil(streams[3].directSourceURL)
+    }
+
+    func testAllowedOutputFormatsNormalizeAndIgnoreUnknowns() throws {
+        let json = #"{"user_info": {"auth": 1, "allowed_output_formats": ["M3U8", "rtmp", "ts"]}}"#
+        let dto = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(json.utf8))
+
+        XCTAssertEqual(dto.userInfo?.toDomain().allowedOutputFormats, [.hls, .ts])
+
+        let absent = #"{"user_info": {"auth": 1}}"#
+        let absentDTO = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(absent.utf8))
+        XCTAssertNil(absentDTO.userInfo?.toDomain().allowedOutputFormats, "absent field means unknown, not empty")
+    }
+
     func testUserInfoMapping() throws {
         let dto = try decodeFixture(AccountInfoDTO.self, from: "account_info_string")
         let status = try XCTUnwrap(dto.userInfo).toDomain()

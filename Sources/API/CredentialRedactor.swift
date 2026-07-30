@@ -4,7 +4,9 @@ import Foundation
 /// go through here first.
 public enum CredentialRedactor {
     private static let mask = "REDACTED"
-    private static let credentialQueryNames: Set<String> = ["username", "password"]
+    // "token" covers provider direct_source URLs, which embed access
+    // tokens as query parameters.
+    private static let credentialQueryNames: Set<String> = ["username", "password", "token"]
     /// Path prefixes whose next two segments are `/{username}/{password}/`.
     private static let credentialPathPrefixes: Set<String> = ["live", "movie", "series", "timeshift"]
 

@@ -10,7 +10,7 @@
     "category_id": 7,
     "custom_sid": "",
     "tv_archive": 0,
-    "direct_source": "",
+    "direct_source": "http://host.example.com/direct/1001.m3u8",
     "tv_archive_duration": 0
   },
   {
