@@ -10,6 +10,19 @@ final class SettingsViewModel: ObservableObject {
         case failure(String)
     }
 
+    /// Success copy for the three shapes a panel reports: a future expiry, no
+    /// known expiry (missing/zero/garbage `exp_date`, sanitized to `nil` in the
+    /// DTO mapping), and the inconsistent case where authentication succeeded
+    /// but the reported expiry is not in the future.
+    static func successMessage(expiryDate: Date?, now: Date = Date()) -> String {
+        guard let expiryDate else { return "Account valid (no expiry reported)" }
+        let formatted = expiryDate.formatted(date: .abbreviated, time: .omitted)
+        if expiryDate <= now {
+            return "Account valid, but the panel reports it expired on \(formatted)"
+        }
+        return "Account valid until \(formatted)"
+    }
+
     /// The pasted playlist URL. It carries the account password, so it is
     /// cleared as soon as it is no longer needed — see ``formDismissed()``.
     @Published var urlText = "" {
