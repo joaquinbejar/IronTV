@@ -74,7 +74,7 @@ private struct AccountLoadFailureView: View {
                     try appModel.discardUnreadableAccount()
                     recoveryError = nil
                 } catch {
-                    recoveryError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    recoveryError = AppModel.nonSecretMessage(for: error)
                 }
             }
             .buttonStyle(.bordered)

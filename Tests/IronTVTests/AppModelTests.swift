@@ -33,6 +33,15 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.account, "a failed load must not masquerade as a configured account")
     }
 
+    func testNonKeychainErrorsFallBackToFixedGenericCopy() {
+        let store = FakeStore()
+        store.loadResult = .failure(URLError(.cannotDecodeContentData, userInfo: [NSLocalizedDescriptionKey: "detail that must not surface"]))
+
+        let model = AppModel(store: store)
+
+        XCTAssertEqual(model.availability, .failed(message: "The stored account could not be accessed."))
+    }
+
     func testFailureMessageCarriesOnlyTheStatusCode() {
         let store = FakeStore()
         store.loadResult = .failure(KeychainError.unexpectedStatus(-25244))

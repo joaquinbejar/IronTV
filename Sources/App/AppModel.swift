@@ -74,14 +74,18 @@ final class AppModel: ObservableObject {
         availability = .loaded(DemoMode.account)
     }
 
-    /// The failure message is the typed error's own description — status codes
-    /// and fixed copy only, never credential data.
+    /// Fixed, non-secret copy only: a typed `KeychainError` description
+    /// (status codes and fixed strings), or a generic fallback — never an
+    /// arbitrary error's own text.
+    static func nonSecretMessage(for error: Error) -> String {
+        (error as? KeychainError)?.errorDescription ?? "The stored account could not be accessed."
+    }
+
     private static func loadAvailability(from store: AccountStoring) -> AccountAvailability {
         do {
             return .loaded(try store.loadAccount())
         } catch {
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            return .failed(message: message)
+            return .failed(message: Self.nonSecretMessage(for: error))
         }
     }
 }

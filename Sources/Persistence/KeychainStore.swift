@@ -91,7 +91,8 @@ public struct KeychainStore {
                     do {
                         try saveAccount(account)
                     } catch {
-                        Self.logger.notice("Legacy Keychain migration failed; will retry on next load: \(String(describing: error), privacy: .public)")
+                        let detail = (error as? KeychainError)?.errorDescription ?? "unrecognized error"
+                        Self.logger.notice("Legacy Keychain migration failed; will retry on next load: \(detail, privacy: .public)")
                     }
                 }
                 return account
