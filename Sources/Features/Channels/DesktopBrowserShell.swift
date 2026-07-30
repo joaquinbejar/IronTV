@@ -185,7 +185,7 @@ struct DesktopBrowserShell: View {
                 }
                 .padding()
             } else {
-                List(channels.filteredStreams, selection: $channels.selectedStreamID) { stream in
+                List(channels.visibleStreams, selection: $channels.selectedStreamID) { stream in
                     ChannelRow(
                         stream: stream,
                         isFavorite: channels.isFavorite(stream.id),

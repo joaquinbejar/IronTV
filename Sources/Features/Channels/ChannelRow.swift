@@ -10,13 +10,8 @@ struct ChannelRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            AsyncImage(url: stream.iconURL) { image in
-                image.resizable().aspectRatio(contentMode: .fit)
-            } placeholder: {
-                Image(systemName: "tv")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 28, height: 28)
+            ChannelIconView(url: stream.iconURL)
+                .frame(width: 28, height: 28)
 
             Text(stream.name)
                 .lineLimit(1)
