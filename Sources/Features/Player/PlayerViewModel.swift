@@ -55,13 +55,50 @@ final class PlayerViewModel: ObservableObject {
     /// run deterministically without spinning real players. nil in production.
     var reconnectStartOverride: ((LiveStream, URL) -> Void)?
 
+    /// Test seam: replaces the AVPlayer access-log read for the transport
+    /// watch. nil in production (reads the real item's access log).
+    var accessLogURIsProvider: (() -> [String])?
+    /// How many access-log entries the transport watch already judged, so a
+    /// long session stays O(new entries) per tick instead of O(log size).
+    /// Reset with every new item/session.
+    private var transportCheckedURICount = 0
+
+    /// URIs the current item's media requests actually hit. The access log is
+    /// per item, so a reconnect starts a fresh history.
+    private func observedAccessURIs() -> [String] {
+        if let accessLogURIsProvider { return accessLogURIsProvider() }
+        guard let item = player.currentItem else { return [] }
+        return item.accessLog()?.events.compactMap(\.uri) ?? []
+    }
+
+    /// Post-hoc transport watch (issue #37): a media request that moved to
+    /// plain http or another origin exposes the path credentials — stop the
+    /// session and surface a typed error instead of continuing to feed it.
+    /// Detection, not prevention: the offending request already happened once.
+    /// The error copy is fixed — the observed URI never reaches a log or the
+    /// UI. VLC has no access log; its gap is documented in the README.
+    private func enforcePlaybackTransport() -> Bool {
+        guard let currentURL else { return false }
+        let uris = observedAccessURIs()
+        guard uris.count > transportCheckedURICount else { return false }
+        let fresh = Array(uris[transportCheckedURICount...])
+        transportCheckedURICount = uris.count
+        guard PlaybackTransportPolicy.firstViolation(in: fresh, plannedOrigin: currentURL) != nil else {
+            return false
+        }
+        stop()
+        state = .failed(PlaybackError.insecureTransport.errorDescription ?? "Playback stopped.")
+        return true
+    }
+
     /// Test seam: primes a session without starting a real engine, so the
     /// reconnect/backoff machinery is observable deterministically.
-    func primeForReconnectTesting(stream: LiveStream, url: URL, tsURL: URL?, settings: PlaybackSettings) {
+    func primeForReconnectTesting(stream: LiveStream, url: URL, tsURL: URL?, settings: PlaybackSettings, state: State = .idle) {
         currentStream = stream
         currentURL = url
         currentTSURL = tsURL
         self.settings = settings
+        self.state = state
     }
 
     /// One pending scheduled reconnect at most; cancelled on stop, on a new
@@ -232,6 +269,7 @@ final class PlayerViewModel: ObservableObject {
 
     func stop() {
         playbackGeneration &+= 1
+        transportCheckedURICount = 0
         cancelScheduledRetry()
         teardown.setTimer(nil)
         stopVLC()
@@ -256,6 +294,7 @@ final class PlayerViewModel: ObservableObject {
 
     private func startPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
         playbackGeneration &+= 1
+        transportCheckedURICount = 0
         settings = settingsStore.load()
         stopVLC()
         engine = .avPlayer
@@ -380,7 +419,8 @@ final class PlayerViewModel: ObservableObject {
         })
     }
 
-    private func watchdogTick() {
+    func watchdogTick() {
+        if engine == .avPlayer, enforcePlaybackTransport() { return }
         guard engine == .avPlayer else { return } // VLC self-recovers via delegate
         guard currentStream != nil, state != .idle else { return }
         if case .failed = state { return }
