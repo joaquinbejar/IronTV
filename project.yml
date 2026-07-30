@@ -9,9 +9,16 @@ options:
 packages:
   # VLC fallback decoder for channels AVPlayer can't play on iOS/tvOS
   # (MP2 audio, interlaced video). Binary SPM wrapper of official VLCKit.
+  #
+  # Pinned to an exact version, not a `from:` range. This is a *binary* LGPL
+  # dependency that ships inside the app, so a clean checkout resolving a
+  # different build would change what we distribute without review. The
+  # generated .xcodeproj — and with it Package.resolved — is gitignored, so
+  # this line is the only reproducibility anchor there is. Bumping it is a
+  # deliberate, reviewed change: see "Dependencies" in README.md.
   VLCKitSPM:
     url: https://github.com/tylerjonesio/vlckit-spm
-    from: "3.6.0"
+    exactVersion: "3.6.0"
 settings:
   base:
     SWIFT_VERSION: "5.9"

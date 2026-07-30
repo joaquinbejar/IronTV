@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes the previous run on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The project is generated from project.yml; the .xcodeproj is not in git.
+  PROJECT: IronTV.xcodeproj
+  # CI has no Apple account, so -allowProvisioningUpdates is unavailable.
+  #
+  # The macOS target declares a *restricted* keychain-access-groups entitlement.
+  # A build that carries it without an embedded provisioning profile is SIGKILLed
+  # by AMFI at launch, which would kill the XCTest host before a single test ran.
+  # So: ad-hoc sign (arm64 binaries must be signed at all to launch) and drop the
+  # entitlements file. No test touches the real Keychain — the stores are behind
+  # injectable seams — so nothing under test needs it.
+  SIGNING_FOR_TESTS: >-
+    CODE_SIGN_IDENTITY=-
+    CODE_SIGN_ENTITLEMENTS=
+    CODE_SIGN_STYLE=Manual
+    PROVISIONING_PROFILE_SPECIFIER=
+    DEVELOPMENT_TEAM=
+  # Simulator builds never launch, so they need no signature at all.
+  SIGNING_FOR_BUILDS: >-
+    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_REQUIRED=NO
+    CODE_SIGN_IDENTITY=
+    CODE_SIGN_ENTITLEMENTS=
+    DEVELOPMENT_TEAM=
+
+jobs:
+  macos-test:
+    name: macOS build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-project
+      - name: Build
+        run: |
+          read -ra signing <<< "$SIGNING_FOR_TESTS"
+          xcodebuild -project "$PROJECT" -scheme IronTV -configuration Debug \
+            -destination 'platform=macOS' "${signing[@]}" build
+      - name: Test
+        run: |
+          read -ra signing <<< "$SIGNING_FOR_TESTS"
+          xcodebuild -project "$PROJECT" -scheme IronTV \
+            -destination 'platform=macOS' "${signing[@]}" test
+
+  ios-build:
+    name: iOS build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-project
+      - name: Build
+        run: |
+          read -ra signing <<< "$SIGNING_FOR_BUILDS"
+          xcodebuild -project "$PROJECT" -scheme IronTV-iOS -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' "${signing[@]}" build
+
+  tvos-build:
+    name: tvOS build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-project
+      - name: Build
+        run: |
+          read -ra signing <<< "$SIGNING_FOR_BUILDS"
+          xcodebuild -project "$PROJECT" -scheme IronTV-tvOS -configuration Debug \
+            -destination 'generic/platform=tvOS Simulator' "${signing[@]}" build
+
+  strict-concurrency:
+    name: Strict concurrency (informational)
+    runs-on: macos-15
+    # Deliberately non-blocking: issue #17 tracks the outstanding warnings, and a
+    # hard gate here would fail every unrelated PR until that lands. This job
+    # exists to make the migration debt visible and measurable, not to stop work.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-project
+      - name: Build with complete checking and count warnings
+        run: |
+          set -o pipefail
+          read -ra signing <<< "$SIGNING_FOR_TESTS"
+          xcodebuild -project "$PROJECT" -scheme IronTV -configuration Debug \
+            -destination 'platform=macOS' "${signing[@]}" \
+            SWIFT_STRICT_CONCURRENCY=complete build 2>&1 | tee strict.log || true
+          count=$(grep -c 'warning:' strict.log || true)
+          {
+            echo "### Strict concurrency"
+            echo "\`SWIFT_STRICT_CONCURRENCY=complete\` produced **$count** warnings."
+            echo ""
+            echo "Tracked by issue #17. This job is informational and never blocks a PR."
+            if [ "$count" -gt 0 ]; then
+              echo ""
+              echo '<details><summary>Warnings</summary>'
+              echo ''
+              echo '```'
+              grep 'warning:' strict.log | sort -u | head -100
+              echo '```'
+              echo '</details>'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  newest-toolchain:
+    name: Newest toolchain (informational)
+    runs-on: macos-latest
+    # macos-latest moves when GitHub promotes a new image. Keeping it informational
+    # means a new Xcode surfaces here as a warning instead of turning every PR red,
+    # while macos-15 above stays the reproducible, blockable gate.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/prepare-project
+      - name: Build & test
+        run: |
+          read -ra signing <<< "$SIGNING_FOR_TESTS"
+          xcodebuild -project "$PROJECT" -scheme IronTV \
+            -destination 'platform=macOS' "${signing[@]}" test
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan tracked files for credentials
+        run: scripts/secret-scan.sh
