@@ -40,6 +40,17 @@ struct PlayerView: View {
             .navigationTitle(chromeHidden ? "" : (viewModel.currentStream?.name ?? "IronTV"))
             .toolbar {
                 if !chromeHidden {
+                    // Non-intrusive diagnostic: which engine is actually
+                    // playing, so Automatic's silent VLC fallback is visible
+                    // and the engine-scoped settings make sense.
+                    if viewModel.currentStream != nil {
+                        ToolbarItem {
+                            Text(viewModel.engine == .vlc ? "VLC" : "Apple")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel(viewModel.engine == .vlc ? "Playing with the VLC engine" : "Playing with the Apple engine")
+                        }
+                    }
                     ToolbarItem {
                         Button {
                             viewModel.resyncToLive()
