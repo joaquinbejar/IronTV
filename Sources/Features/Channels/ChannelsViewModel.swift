@@ -187,7 +187,8 @@ final class ChannelsViewModel: ObservableObject {
 
     private func makeCategoriesLoadTask() -> Task<Void, Never> {
         Task { [weak self] () -> Void in
-            guard let fetch = self?.beginCategoriesLoad() else { return }
+            // A waiter cancelled before it ever ran must not plan or fetch.
+            guard !Task.isCancelled, let fetch = self?.beginCategoriesLoad() else { return }
             let result: Result<[Category], Error>
             do {
                 result = .success(try await withTaskCancellationHandler {
@@ -234,8 +235,15 @@ final class ChannelsViewModel: ObservableObject {
     @discardableResult
     private func restartStreamsLoad(bypassCache: Bool = false) -> Task<Void, Never> {
         streamsTask?.cancel()
+        // Captured now: the task plans for the selection that requested it,
+        // never for whatever the selection has become by the time it runs.
+        let intended = selectedCategory
         let task = Task { [weak self] () -> Void in
-            guard let plan = self?.beginStreamsLoad(bypassCache: bypassCache) else { return }
+            // A waiter cancelled before it ever ran must not plan or fetch —
+            // a rapid A→B→A switch would otherwise hit the provider once per
+            // superseded waiter.
+            guard !Task.isCancelled,
+                  let plan = self?.beginStreamsLoad(for: intended, bypassCache: bypassCache) else { return }
             guard case .fetch(let selection, let fetch, let exclusive) = plan else { return }
             let result: Result<[LiveStream], Error>
             do {
@@ -264,8 +272,11 @@ final class ChannelsViewModel: ObservableObject {
         case fetch(CategorySelection, Task<[LiveStream], Error>, exclusive: Bool)
     }
 
-    private func beginStreamsLoad(bypassCache: Bool) -> StreamsLoadPlan {
-        guard let selection = selectedCategory else {
+    private func beginStreamsLoad(for intended: CategorySelection?, bypassCache: Bool) -> StreamsLoadPlan {
+        // Superseded before it started (the didSet cancel should have caught
+        // it, but the guard costs nothing and closes the race).
+        guard intended == selectedCategory else { return .served }
+        guard let selection = intended else {
             streams = []
             streamsPhase = .loaded
             return .served
@@ -343,6 +354,10 @@ final class ChannelsViewModel: ObservableObject {
 
     private static func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError { return true }
+        // Both shapes reach here: the client wraps URLSession's error in
+        // XtreamAPIError.network, but a ChannelBrowsing conformer may throw
+        // the raw URLError directly.
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
         if case XtreamAPIError.network(let urlError) = error, urlError.code == .cancelled { return true }
         return false
     }

@@ -1,7 +1,8 @@
 import XCTest
 @testable import IronTV
 
-@MainActor
+/// Individual tests are `@MainActor`; setUp/tearDown stay nonisolated XCTest
+/// lifecycle overrides, so the class carries no actor isolation.
 final class ChannelsViewModelTests: XCTestCase {
 
     private let account = Account(
@@ -24,56 +25,101 @@ final class ChannelsViewModelTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Doubles
+    // MARK: - Scripted browser
 
-    private actor Gate {
-        private var continuations: [CheckedContinuation<Void, Never>] = []
-        private var isOpen = false
-
-        func wait() async {
-            if isOpen { return }
-            await withCheckedContinuation { continuations.append($0) }
+    /// Deterministic catalog double. An actor, so the whole script and every
+    /// counter share one isolation domain; `waitUntilStreamRequests(_:)` is
+    /// the handshake that lets a test know a fetch has actually entered
+    /// before it flips state; held fetches react to cancellation by throwing,
+    /// which is what makes "provider work stopped" observable.
+    private actor ScriptedBrowser: ChannelBrowsing {
+        struct Script {
+            var categories: [IronTV.Category] = [
+                IronTV.Category(id: CategoryID(1), name: "A"),
+                IronTV.Category(id: CategoryID(2), name: "B"),
+            ]
+            var streamsByCategory: [Int: [LiveStream]] = [:]
+            var allStreams: [LiveStream] = []
+            /// Categories whose fetch stays suspended until `releaseHolds()`;
+            /// use `-1` for the full-list fetch.
+            var held: Set<Int> = []
+            /// Categories whose fetch throws this error; `-1` for the full list.
+            var errors: [Int: Error] = [:]
         }
 
-        func open() {
-            isOpen = true
-            continuations.forEach { $0.resume() }
-            continuations.removeAll()
+        private var script = Script()
+        private(set) var categoryCalls: [Int] = []
+        private(set) var allStreamsCalls = 0
+        private(set) var cancelledFetches = 0
+        private var holdWaiters: [CheckedContinuation<Void, Never>] = []
+        private var entryWaiters: [(threshold: Int, continuation: CheckedContinuation<Void, Never>)] = []
+        private var streamRequests = 0
+
+        func configure(_ mutate: @Sendable (inout Script) -> Void) {
+            mutate(&script)
         }
-    }
 
-    /// Scripted catalog: per-category results, optional gates to hold a
-    /// request in flight, and counters for the dedup assertions.
-    private final class FakeBrowser: ChannelBrowsing, @unchecked Sendable {
-        var categories: [IronTV.Category] = [IronTV.Category(id: CategoryID(1), name: "A"), IronTV.Category(id: CategoryID(2), name: "B")]
-        var streamsByCategory: [Int: [LiveStream]] = [:]
-        var allStreams: [LiveStream] = []
-        var streamsError: Error?
-        var streamsGate: Gate?
-        var allStreamsGate: Gate?
+        /// Suspends until at least `count` stream fetches have entered.
+        func waitUntilStreamRequests(_ count: Int) async {
+            if streamRequests >= count { return }
+            await withCheckedContinuation { entryWaiters.append((count, $0)) }
+        }
 
-        private let lock = NSLock()
-        private var _allStreamsCalls = 0
-        private var _categoryCalls: [Int] = []
-        var allStreamsCalls: Int { lock.lock(); defer { lock.unlock() }; return _allStreamsCalls }
-        var categoryCalls: [Int] { lock.lock(); defer { lock.unlock() }; return _categoryCalls }
+        func releaseHolds() {
+            script.held = []
+            holdWaiters.forEach { $0.resume() }
+            holdWaiters.removeAll()
+        }
 
-        func liveCategories() async throws -> [IronTV.Category] { categories }
+        private func recordEntry() {
+            streamRequests += 1
+            let reached = streamRequests
+            let ready = entryWaiters.filter { $0.threshold <= reached }
+            entryWaiters.removeAll { $0.threshold <= reached }
+            ready.forEach { $0.continuation.resume() }
+        }
+
+        private func holdIfScripted(_ slot: Int) async throws {
+            if script.held.contains(slot) {
+                await withTaskCancellationHandler {
+                    await withCheckedContinuation { continuation in
+                        if script.held.contains(slot) {
+                            holdWaiters.append(continuation)
+                        } else {
+                            continuation.resume()
+                        }
+                    }
+                } onCancel: {
+                    Task { await self.releaseHolds() }
+                }
+            }
+            do {
+                try Task.checkCancellation()
+            } catch {
+                cancelledFetches += 1
+                throw error
+            }
+        }
+
+        func liveCategories() async throws -> [IronTV.Category] {
+            script.categories
+        }
 
         func liveStreams(in categoryID: CategoryID?) async throws -> [LiveStream] {
+            let slot = categoryID?.rawValue ?? -1
             if let categoryID {
-                lock.lock(); _categoryCalls.append(categoryID.rawValue); lock.unlock()
-                if let streamsGate { await streamsGate.wait() }
-                if let streamsError { throw streamsError }
-                return streamsByCategory[categoryID.rawValue] ?? []
+                categoryCalls.append(categoryID.rawValue)
+            } else {
+                allStreamsCalls += 1
             }
-            lock.lock(); _allStreamsCalls += 1; lock.unlock()
-            if let allStreamsGate { await allStreamsGate.wait() }
-            if let streamsError { throw streamsError }
-            return allStreams
+            recordEntry()
+            try await holdIfScripted(slot)
+            if let error = script.errors[slot] { throw error }
+            if categoryID == nil { return script.allStreams }
+            return script.streamsByCategory[slot] ?? []
         }
 
-        func playbackURL(for streamID: StreamID, format: XtreamClient.StreamFormat) throws -> URL {
+        nonisolated func playbackURL(for streamID: StreamID, format: XtreamClient.StreamFormat) throws -> URL {
             guard let url = URL(string: "http://host.example.com/live/u/p/\(streamID.rawValue).\(format.rawValue)") else {
                 throw XtreamAPIError.invalidURL
             }
@@ -81,11 +127,12 @@ final class ChannelsViewModelTests: XCTestCase {
         }
     }
 
-    private func stream(_ id: Int, _ name: String = "S") -> LiveStream {
-        LiveStream(id: StreamID(id), name: "\(name)\(id)", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
+    private static func stream(_ id: Int) -> LiveStream {
+        LiveStream(id: StreamID(id), name: "S\(id)", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
     }
 
-    private func makeViewModel(_ browser: FakeBrowser) -> ChannelsViewModel {
+    @MainActor
+    private func makeViewModel(_ browser: ScriptedBrowser) -> ChannelsViewModel {
         ChannelsViewModel(
             account: account,
             lastChannel: LastChannelStore(identity: account.identity, storage: defaults),
@@ -94,92 +141,110 @@ final class ChannelsViewModelTests: XCTestCase {
         )
     }
 
-    /// Lets the init-time categories load settle so tests start deterministic.
+    /// Lets scheduled main-actor work drain so assertions are deterministic.
+    @MainActor
     private func settle() async {
-        for _ in 0..<10 { await Task.yield() }
+        for _ in 0..<20 { await Task.yield() }
     }
 
     // MARK: - Cancellation
 
-    func testRapidCategorySwitchingOnlyTheFinalSelectionLands() async {
-        let browser = FakeBrowser()
-        browser.streamsByCategory = [1: [stream(11)], 2: [stream(22)]]
-        let gate = Gate()
-        browser.streamsGate = gate
+    /// The regression the review caught: waiters cancelled before they ever
+    /// ran must not reach the provider — a rapid A→B→A switch performs
+    /// exactly one fetch, for the final selection.
+    @MainActor
+    func testRapidSwitchingFetchesOnlyTheFinalSelection() async {
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.streamsByCategory = [1: [Self.stream(11)], 2: [Self.stream(22)]] }
         let viewModel = makeViewModel(browser)
         await settle()
 
         viewModel.selectedCategory = .category(CategoryID(1))
         viewModel.selectedCategory = .category(CategoryID(2))
         viewModel.selectedCategory = .category(CategoryID(1))
-        await gate.open()
-        await viewModel.loadStreams() // drains through the retained task path
+        await viewModel.loadStreams()
+        await settle()
 
-        XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(11)], "only the final selection may populate the list")
+        let calls = await browser.categoryCalls
+        XCTAssertEqual(calls, [1], "already-cancelled waiters must never reach the provider")
+        XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(11)])
         XCTAssertEqual(viewModel.streamsPhase, .loaded)
     }
 
-    func testStaleSuccessCannotTouchPhaseOrCache() async {
-        let browser = FakeBrowser()
-        browser.streamsByCategory = [1: [stream(11)], 2: [stream(22)]]
-        let gate = Gate()
-        browser.streamsGate = gate
+    @MainActor
+    func testStaleSuccessCannotTouchPhaseOrList() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [1: [Self.stream(11)], 2: [Self.stream(22)]]
+            $0.held = [1]
+        }
         let viewModel = makeViewModel(browser)
         await settle()
 
-        viewModel.selectedCategory = .category(CategoryID(1)) // held by the gate
-        browser.streamsGate = nil
-        viewModel.selectedCategory = .category(CategoryID(2)) // completes immediately
-        await Task.yield()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await browser.waitUntilStreamRequests(1) // A's fetch is genuinely in flight
+        viewModel.selectedCategory = .category(CategoryID(2))
         await viewModel.loadStreams()
-        await gate.open() // release the stale category-1 response
-        await settle()
-
         XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(22)])
+
+        await browser.releaseHolds() // the stale A response arrives late
+        await settle()
+
+        XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(22)], "a stale success must change nothing")
         XCTAssertEqual(viewModel.streamsPhase, .loaded)
     }
 
+    @MainActor
     func testStaleFailureCannotFlashAnError() async {
-        let browser = FakeBrowser()
-        browser.streamsByCategory = [2: [stream(22)]]
-        browser.streamsError = XtreamAPIError.httpStatus(500)
-        let gate = Gate()
-        browser.streamsGate = gate
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [2: [Self.stream(22)]]
+            $0.errors = [1: XtreamAPIError.httpStatus(500)]
+            $0.held = [1]
+        }
         let viewModel = makeViewModel(browser)
         await settle()
 
-        viewModel.selectedCategory = .category(CategoryID(1)) // will fail, but held
-        browser.streamsGate = nil
-        browser.streamsError = nil
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await browser.waitUntilStreamRequests(1) // the failing fetch is held in flight
         viewModel.selectedCategory = .category(CategoryID(2))
-        await Task.yield()
         await viewModel.loadStreams()
-        await gate.open()
+
+        await browser.releaseHolds() // the stale failure arrives late
         await settle()
 
         XCTAssertEqual(viewModel.streamsPhase, .loaded, "a stale failure must not surface")
     }
 
-    func testCancellationIsNotAUserFacingFailure() async {
-        let browser = FakeBrowser()
-        browser.streamsError = CancellationError()
-        let viewModel = makeViewModel(browser)
-        await settle()
+    /// Both cancellation shapes: raw URLError(.cancelled) from a conformer,
+    /// and the client's wrapped XtreamAPIError.network form.
+    @MainActor
+    func testCancellationIsNeverAUserFacingFailure() async {
+        for cancellation: Error in [
+            CancellationError(),
+            URLError(.cancelled),
+            XtreamAPIError.network(URLError(.cancelled)),
+        ] {
+            let browser = ScriptedBrowser()
+            await browser.configure { [cancellation] in $0.errors = [1: cancellation] }
+            let viewModel = makeViewModel(browser)
+            await settle()
 
-        viewModel.selectedCategory = .category(CategoryID(1))
-        await viewModel.loadStreams()
+            viewModel.selectedCategory = .category(CategoryID(1))
+            await viewModel.loadStreams()
 
-        XCTAssertNotEqual(viewModel.streamsPhase, .failed("cancelled"), "cancellation never reaches the failed phase")
-        if case .failed = viewModel.streamsPhase {
-            XCTFail("cancellation surfaced as a failure: \(viewModel.streamsPhase)")
+            if case .failed = viewModel.streamsPhase {
+                XCTFail("cancellation surfaced as a failure for \(cancellation)")
+            }
         }
     }
 
     // MARK: - Retry
 
+    @MainActor
     func testRetryAfterFailureRecovers() async {
-        let browser = FakeBrowser()
-        browser.streamsError = XtreamAPIError.httpStatus(500)
+        let browser = ScriptedBrowser()
+        await browser.configure { $0.errors = [1: XtreamAPIError.httpStatus(500)] }
         let viewModel = makeViewModel(browser)
         await settle()
 
@@ -189,8 +254,10 @@ final class ChannelsViewModelTests: XCTestCase {
             return XCTFail("expected a failure first, got \(viewModel.streamsPhase)")
         }
 
-        browser.streamsError = nil
-        browser.streamsByCategory = [1: [stream(11)]]
+        await browser.configure {
+            $0.errors = [:]
+            $0.streamsByCategory = [1: [Self.stream(11)]]
+        }
         await viewModel.loadStreams(bypassCache: true)
 
         XCTAssertEqual(viewModel.streamsPhase, .loaded)
@@ -199,44 +266,55 @@ final class ChannelsViewModelTests: XCTestCase {
 
     // MARK: - All-streams dedup
 
+    @MainActor
     func testConcurrentAllAndFavoritesIssueASingleFullListRequest() async {
-        let browser = FakeBrowser()
-        browser.allStreams = [stream(1), stream(2)]
-        let gate = Gate()
-        browser.allStreamsGate = gate
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.allStreams = [Self.stream(1), Self.stream(2)]
+            $0.held = [-1]
+        }
         let viewModel = makeViewModel(browser)
         await settle()
         viewModel.toggleFavorite(StreamID(2))
 
-        viewModel.selectedCategory = .all       // starts the shared fetch, held
-        await Task.yield()
-        viewModel.selectedCategory = .favorites // must reuse the same fetch
-        await Task.yield()
-        await gate.open()
+        viewModel.selectedCategory = .all
+        await browser.waitUntilStreamRequests(1) // the shared fetch is in flight
+        viewModel.selectedCategory = .favorites  // must reuse it, not re-fetch
+        await browser.releaseHolds()
         await viewModel.loadStreams()
         await settle()
 
-        XCTAssertEqual(browser.allStreamsCalls, 1, "All and Favorites must share one full-list request")
+        let fullListCalls = await browser.allStreamsCalls
+        XCTAssertEqual(fullListCalls, 1, "All and Favorites must share one full-list request")
         XCTAssertEqual(viewModel.streams.map(\.id), [StreamID(2)], "favorites filter over the shared list")
     }
 
     // MARK: - Deallocation
 
-    func testDeallocationCancelsInFlightWorkAndReleasesTheViewModel() async {
-        let browser = FakeBrowser()
-        let gate = Gate()
-        browser.streamsGate = gate
+    @MainActor
+    func testDeallocationCancelsTheInFlightProviderFetch() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [1: [Self.stream(11)]]
+            $0.held = [1]
+        }
         var viewModel: ChannelsViewModel? = makeViewModel(browser)
         await settle()
-        viewModel?.selectedCategory = .category(CategoryID(1)) // held in flight
-        await Task.yield()
+        viewModel?.selectedCategory = .category(CategoryID(1))
+        await browser.waitUntilStreamRequests(1) // provider work genuinely started
 
-        weak var weakViewModel = viewModel
+        weak let released = viewModel
         viewModel = nil
         await settle()
 
-        XCTAssertNil(weakViewModel, "an in-flight load must not keep the view model alive")
-        await gate.open() // releasing the gate afterwards must be harmless
-        await settle()
+        XCTAssertNil(released, "an in-flight load must not keep the view model alive")
+        // The gate reacts to cancellation: the fetch must have stopped, not
+        // merely been abandoned.
+        for _ in 0..<50 {
+            if await browser.cancelledFetches > 0 { break }
+            await Task.yield()
+        }
+        let cancelled = await browser.cancelledFetches
+        XCTAssertGreaterThan(cancelled, 0, "releasing the owner must cancel the provider fetch itself")
     }
 }
