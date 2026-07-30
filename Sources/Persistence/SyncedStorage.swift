@@ -146,8 +146,17 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
             break
         }
 
-        let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
-        guard !changedKeys.isEmpty else { return }
+        var changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
+        if changedKeys.isEmpty {
+            // Account change and initial sync can arrive without a per-key
+            // list — adopt the whole remote state rather than staying on the
+            // previous account's (or pre-sync) values. Other reasons with no
+            // keys really mean nothing to do.
+            guard reason == NSUbiquitousKeyValueStoreAccountChange
+                || reason == NSUbiquitousKeyValueStoreInitialSyncChange else { return }
+            changedKeys = Array(cloud.dictionaryRepresentation.keys)
+            guard !changedKeys.isEmpty else { return }
+        }
         Self.logger.debug("Adopting \(changedKeys.count, privacy: .public) remote key(s), reason \(reason.map(String.init) ?? "unknown", privacy: .public).")
 
         for key in changedKeys {

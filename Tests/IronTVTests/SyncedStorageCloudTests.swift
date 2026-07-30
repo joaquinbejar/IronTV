@@ -156,4 +156,34 @@ final class SyncedStorageCloudTests: XCTestCase {
 
         XCTAssertEqual(storage.object(forKey: "acct.key") as? Int, 2)
     }
+
+    /// The system may omit the per-key list for account changes and initial
+    /// sync — the whole remote state must be adopted then, not skipped.
+    func testAccountChangeWithoutAKeyListAdoptsTheWholeRemoteState() {
+        let cloud = FakeCloudStore()
+        let storage = SyncedStorage(defaults: defaults, cloud: cloud)
+        storage.set(1, forKey: "acct.key")
+        let folds = NSMutableArray()
+        let bag = observeFolds(into: folds)
+        defer { bag.removeObservers() }
+
+        cloud.values = ["acct.key": 2, "other.key": 3]
+        cloud.postExternalChange(keys: [], reason: NSUbiquitousKeyValueStoreAccountChange)
+
+        XCTAssertEqual(storage.object(forKey: "acct.key") as? Int, 2)
+        XCTAssertEqual(storage.object(forKey: "other.key") as? Int, 3)
+        XCTAssertEqual(folds.count, 1)
+        XCTAssertEqual((folds.firstObject as? [String])?.sorted(), ["acct.key", "other.key"])
+    }
+
+    func testServerChangeWithoutAKeyListStaysANoOp() {
+        let cloud = FakeCloudStore()
+        let storage = SyncedStorage(defaults: defaults, cloud: cloud)
+        storage.set(1, forKey: "kept.key")
+
+        cloud.values["kept.key"] = 99
+        cloud.postExternalChange(keys: [], reason: NSUbiquitousKeyValueStoreServerChange)
+
+        XCTAssertEqual(storage.object(forKey: "kept.key") as? Int, 1)
+    }
 }
