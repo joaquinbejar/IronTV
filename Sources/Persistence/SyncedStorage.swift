@@ -36,10 +36,11 @@ extension UserDefaults: KeyValueStorage {}
 ///
 /// Isolation model (`@unchecked Sendable` justification): every stored
 /// property is an immutable reference — `UserDefaults` and
-/// `NSUbiquitousKeyValueStore` are documented thread-safe, and the observer
-/// token lives in a locking ``TeardownBag``. The iCloud fold-in is serialized
-/// on the main queue, and `didChangeExternallyNotification` is always posted
-/// there.
+/// `NSUbiquitousKeyValueStore` are documented thread-safe, the observer
+/// token lives in a locking ``TeardownBag``, and the mirrored-key registry's
+/// read-modify-write cycles are serialized by `registryLock`. The iCloud
+/// fold-in is serialized on the main queue, and
+/// `didChangeExternallyNotification` is always posted there.
 public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     public static let shared = SyncedStorage()
 
@@ -55,6 +56,14 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     /// on every launch. Gated by the `IronTVCloudKVSEnabled` Info.plist flag.
     private let cloud: CloudKeyValueStore?
     private let teardown = TeardownBag()
+
+    /// Which UserDefaults keys this store mirrors to iCloud. Needed for
+    /// account-change semantics: the new account's data *replaces* the
+    /// previous account's, so mirrored keys absent from the new account must
+    /// be removed locally — and only the registry knows which those are.
+    /// Local-only (never mirrored itself); RMW serialized by `registryLock`.
+    private static let mirroredKeysRegistryKey = "IronTVSyncedStorage.mirroredKeys"
+    private let registryLock = NSLock()
 
     /// Sync diagnostics: change reasons and key counts only — never values,
     /// which can be account-scoped preference data.
@@ -106,11 +115,13 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
         // (nine keys) into a burst of sync requests. The documented KVS
         // lifecycle batches and uploads on its own schedule.
         cloud?.set(value, forKey: defaultName)
+        rememberMirrored(defaultName)
     }
 
     public func removeObject(forKey defaultName: String) {
         defaults.removeObject(forKey: defaultName)
         cloud?.removeObject(forKey: defaultName)
+        forgetMirrored(defaultName)
     }
 
     /// First launch after sync is enabled: iCloud holds nothing for a key this
@@ -121,6 +132,32 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
     private func seedCloudIfEmpty(_ key: String, local: Any?) {
         guard let cloud, let local, cloud.object(forKey: key) == nil else { return }
         cloud.set(local, forKey: key)
+        rememberMirrored(key)
+    }
+
+    // MARK: - Mirrored-key registry
+
+    private var mirroredKeys: [String] {
+        defaults.stringArray(forKey: Self.mirroredKeysRegistryKey) ?? []
+    }
+
+    private func rememberMirrored(_ key: String) {
+        guard cloud != nil else { return }
+        registryLock.lock()
+        defer { registryLock.unlock() }
+        var keys = mirroredKeys
+        guard !keys.contains(key) else { return }
+        keys.append(key)
+        defaults.set(keys, forKey: Self.mirroredKeysRegistryKey)
+    }
+
+    private func forgetMirrored(_ key: String) {
+        guard cloud != nil else { return }
+        registryLock.lock()
+        defer { registryLock.unlock() }
+        let keys = mirroredKeys
+        guard keys.contains(key) else { return }
+        defaults.set(keys.filter { $0 != key }, forKey: Self.mirroredKeysRegistryKey)
     }
 
     /// Conflict semantics, applied here for every synced value: per-key
@@ -149,12 +186,14 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
         var changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
         if changedKeys.isEmpty {
             // Account change and initial sync can arrive without a per-key
-            // list — adopt the whole remote state rather than staying on the
-            // previous account's (or pre-sync) values. Other reasons with no
-            // keys really mean nothing to do.
+            // list. The new account's data *replaces* the previous account's,
+            // so the affected set is the union of what the new store holds
+            // and every key we ever mirrored — mirrored keys absent remotely
+            // (including all of them, for an empty new store) get removed by
+            // the fold below. Other reasons with no keys mean nothing to do.
             guard reason == NSUbiquitousKeyValueStoreAccountChange
                 || reason == NSUbiquitousKeyValueStoreInitialSyncChange else { return }
-            changedKeys = Array(cloud.dictionaryRepresentation.keys)
+            changedKeys = Array(Set(cloud.dictionaryRepresentation.keys).union(mirroredKeys))
             guard !changedKeys.isEmpty else { return }
         }
         Self.logger.debug("Adopting \(changedKeys.count, privacy: .public) remote key(s), reason \(reason.map(String.init) ?? "unknown", privacy: .public).")
@@ -162,8 +201,10 @@ public final class SyncedStorage: KeyValueStorage, @unchecked Sendable {
         for key in changedKeys {
             if let value = cloud.object(forKey: key) {
                 defaults.set(value, forKey: key)
+                rememberMirrored(key)
             } else {
                 defaults.removeObject(forKey: key)
+                forgetMirrored(key)
             }
         }
 

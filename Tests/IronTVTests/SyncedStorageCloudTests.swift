@@ -3,7 +3,9 @@ import XCTest
 
 /// Sync behavior against a scripted cloud store: batching, first-sync
 /// seeding, conflicts, deletions, and change reasons — no iCloud container.
-@MainActor
+/// Individual tests are `@MainActor` (fold-in notifications are delivered on
+/// the main queue); setUp/tearDown stay nonisolated XCTest lifecycle
+/// overrides, so the class itself carries no actor isolation.
 final class SyncedStorageCloudTests: XCTestCase {
 
     private final class FakeCloudStore: CloudKeyValueStore, @unchecked Sendable {
@@ -33,6 +35,25 @@ final class SyncedStorageCloudTests: XCTestCase {
         }
     }
 
+    /// Synchronized recorder for fold-in notifications — safe to capture in
+    /// the `@Sendable` observer closure, unlike an NSMutableArray.
+    private final class FoldRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var recorded: [[String]] = []
+
+        func record(_ keys: [String]) {
+            lock.lock()
+            recorded.append(keys)
+            lock.unlock()
+        }
+
+        var folds: [[String]] {
+            lock.lock()
+            defer { lock.unlock() }
+            return recorded
+        }
+    }
+
     private var defaults: UserDefaults!
     private let suiteName = "SyncedStorageCloudTests.\(UUID().uuidString)"
 
@@ -47,8 +68,8 @@ final class SyncedStorageCloudTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Counts our re-read notifications while keeping the token owned.
-    private func observeFolds(into changed: NSMutableArray) -> TeardownBag {
+    /// Records our re-read notifications while keeping the token owned.
+    private func observeFolds(into recorder: FoldRecorder) -> TeardownBag {
         let bag = TeardownBag()
         bag.store(NotificationCenter.default.addObserver(
             forName: SyncedStorage.didChangeExternallyNotification,
@@ -56,11 +77,12 @@ final class SyncedStorageCloudTests: XCTestCase {
             queue: .main
         ) { notification in
             let keys = notification.userInfo?[SyncedStorage.changedKeysUserInfoKey] as? [String] ?? []
-            changed.add(keys)
+            recorder.record(keys)
         })
         return bag
     }
 
+    @MainActor
     func testInitAdoptsExistingCloudStateWithASingleSynchronize() {
         let cloud = FakeCloudStore()
         cloud.values = ["remote.key": 7]
@@ -71,6 +93,7 @@ final class SyncedStorageCloudTests: XCTestCase {
         XCTAssertEqual(cloud.synchronizeCount, 1, "exactly the deliberate startup synchronize")
     }
 
+    @MainActor
     func testBurstSettingsSaveForcesNoAdditionalSynchronize() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
@@ -83,6 +106,7 @@ final class SyncedStorageCloudTests: XCTestCase {
         XCTAssertEqual(cloud.values["playback.apiTimeoutSeconds"] as? Double, 42, "writes still mirror to the cloud")
     }
 
+    @MainActor
     func testFirstSyncSeedsALocalValueOnRead() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
@@ -94,10 +118,11 @@ final class SyncedStorageCloudTests: XCTestCase {
         XCTAssertEqual(cloud.synchronizeCount, 1, "seeding must not force a synchronize either")
     }
 
+    @MainActor
     func testRemoteChangeFoldsInAndNotifiesOnce() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
-        let folds = NSMutableArray()
+        let folds = FoldRecorder()
         let bag = observeFolds(into: folds)
         defer { bag.removeObservers() }
 
@@ -105,10 +130,10 @@ final class SyncedStorageCloudTests: XCTestCase {
         cloud.postExternalChange(keys: ["favorites.v1.abc"], reason: NSUbiquitousKeyValueStoreServerChange)
 
         XCTAssertEqual(storage.array(forKey: "favorites.v1.abc") as? [Int], [2002], "remote wins")
-        XCTAssertEqual(folds.count, 1)
-        XCTAssertEqual(folds.firstObject as? [String], ["favorites.v1.abc"])
+        XCTAssertEqual(folds.folds, [["favorites.v1.abc"]])
     }
 
+    @MainActor
     func testTwoDeviceConflictRemoteWinsWholesale() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
@@ -120,6 +145,7 @@ final class SyncedStorageCloudTests: XCTestCase {
         XCTAssertEqual(storage.array(forKey: "favorites.v1.abc") as? [Int], [2, 3])
     }
 
+    @MainActor
     func testRemoteDeletionPropagates() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
@@ -131,11 +157,12 @@ final class SyncedStorageCloudTests: XCTestCase {
         XCTAssertNil(storage.object(forKey: "some.key"))
     }
 
+    @MainActor
     func testQuotaViolationAdoptsNothingAndStaysQuiet() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
         storage.set(1, forKey: "kept.key")
-        let folds = NSMutableArray()
+        let folds = FoldRecorder()
         let bag = observeFolds(into: folds)
         defer { bag.removeObservers() }
 
@@ -143,9 +170,10 @@ final class SyncedStorageCloudTests: XCTestCase {
         cloud.postExternalChange(keys: ["kept.key"], reason: NSUbiquitousKeyValueStoreQuotaViolationChange)
 
         XCTAssertEqual(storage.object(forKey: "kept.key") as? Int, 1, "local values stay authoritative on quota refusal")
-        XCTAssertEqual(folds.count, 0)
+        XCTAssertTrue(folds.folds.isEmpty)
     }
 
+    @MainActor
     func testAccountChangeAdoptsTheNewAccountsState() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
@@ -159,11 +187,12 @@ final class SyncedStorageCloudTests: XCTestCase {
 
     /// The system may omit the per-key list for account changes and initial
     /// sync — the whole remote state must be adopted then, not skipped.
+    @MainActor
     func testAccountChangeWithoutAKeyListAdoptsTheWholeRemoteState() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)
         storage.set(1, forKey: "acct.key")
-        let folds = NSMutableArray()
+        let folds = FoldRecorder()
         let bag = observeFolds(into: folds)
         defer { bag.removeObservers() }
 
@@ -172,10 +201,45 @@ final class SyncedStorageCloudTests: XCTestCase {
 
         XCTAssertEqual(storage.object(forKey: "acct.key") as? Int, 2)
         XCTAssertEqual(storage.object(forKey: "other.key") as? Int, 3)
-        XCTAssertEqual(folds.count, 1)
-        XCTAssertEqual((folds.firstObject as? [String])?.sorted(), ["acct.key", "other.key"])
+        XCTAssertEqual(folds.folds.count, 1)
+        XCTAssertEqual(folds.folds.first?.sorted(), ["acct.key", "other.key"])
     }
 
+    /// An account change *replaces* the previous account's data: mirrored keys
+    /// the new account doesn't have must be removed, not left behind.
+    @MainActor
+    func testAccountChangeRemovesValuesOnlyThePreviousAccountHad() {
+        let cloud = FakeCloudStore()
+        let storage = SyncedStorage(defaults: defaults, cloud: cloud)
+        storage.set(1, forKey: "old-account-only.key")
+        storage.set(1, forKey: "shared.key")
+        let folds = FoldRecorder()
+        let bag = observeFolds(into: folds)
+        defer { bag.removeObservers() }
+
+        cloud.values = ["shared.key": 2]
+        cloud.postExternalChange(keys: [], reason: NSUbiquitousKeyValueStoreAccountChange)
+
+        XCTAssertNil(storage.object(forKey: "old-account-only.key"), "the previous account's value must not survive")
+        XCTAssertEqual(storage.object(forKey: "shared.key") as? Int, 2)
+        XCTAssertEqual(folds.folds.first?.sorted(), ["old-account-only.key", "shared.key"])
+    }
+
+    @MainActor
+    func testAccountChangeToAnEmptyStoreClearsEveryMirroredKey() {
+        let cloud = FakeCloudStore()
+        let storage = SyncedStorage(defaults: defaults, cloud: cloud)
+        storage.set(1, forKey: "a.key")
+        storage.set(2, forKey: "b.key")
+
+        cloud.values = [:]
+        cloud.postExternalChange(keys: [], reason: NSUbiquitousKeyValueStoreAccountChange)
+
+        XCTAssertNil(storage.object(forKey: "a.key"))
+        XCTAssertNil(storage.object(forKey: "b.key"))
+    }
+
+    @MainActor
     func testServerChangeWithoutAKeyListStaysANoOp() {
         let cloud = FakeCloudStore()
         let storage = SyncedStorage(defaults: defaults, cloud: cloud)

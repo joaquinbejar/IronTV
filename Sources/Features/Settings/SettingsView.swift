@@ -240,13 +240,12 @@ struct AccountSettingsTab: View {
 // MARK: - Playback
 
 struct PlaybackSettingsTab: View {
-    private let store = PlaybackSettingsStore()
-    @State private var settings = PlaybackSettings.default
+    @StateObject private var model = PlaybackSettingsModel()
 
     var body: some View {
         Form {
             Section {
-                Picker("Playback engine", selection: $settings.preferredEngine) {
+                Picker("Playback engine", selection: $model.settings.preferredEngine) {
                     Text("Automatic").tag(PlaybackEngineOption.auto)
                     Text("Apple (HLS)").tag(PlaybackEngineOption.avplayer)
                     Text("VLC (MPEG-TS)").tag(PlaybackEngineOption.vlc)
@@ -259,9 +258,9 @@ struct PlaybackSettingsTab: View {
             }
 
             Section {
-                secondsStepper("Forward buffer", value: $settings.forwardBufferSeconds, in: 5...120, step: 5)
-                secondsStepper("Live delay (stall cushion)", value: $settings.liveEdgeOffsetSeconds, in: 0...60, step: 5)
-                Toggle("Fast start (may stutter on weak connections)", isOn: $settings.fastStart)
+                secondsStepper("Forward buffer", value: $model.settings.forwardBufferSeconds, in: 5...120, step: 5)
+                secondsStepper("Live delay (stall cushion)", value: $model.settings.liveEdgeOffsetSeconds, in: 0...60, step: 5)
+                Toggle("Fast start (may stutter on weak connections)", isOn: $model.settings.fastStart)
             } header: {
                 Text("Buffering")
             } footer: {
@@ -270,20 +269,19 @@ struct PlaybackSettingsTab: View {
             }
 
             Section("Auto-reconnect") {
-                secondsStepper("Reconnect after buffering for", value: $settings.waitingTimeoutSeconds, in: 2...60, step: 1)
-                secondsStepper("Reconnect after frozen video for", value: $settings.frozenTimeoutSeconds, in: 2...60, step: 1)
-                secondsStepper("Health check interval", value: $settings.watchdogIntervalSeconds, in: 1...10, step: 1)
-                intStepper("Max reconnect attempts", value: $settings.maxReconnectAttempts, in: 1...10)
+                secondsStepper("Reconnect after buffering for", value: $model.settings.waitingTimeoutSeconds, in: 2...60, step: 1)
+                secondsStepper("Reconnect after frozen video for", value: $model.settings.frozenTimeoutSeconds, in: 2...60, step: 1)
+                secondsStepper("Health check interval", value: $model.settings.watchdogIntervalSeconds, in: 1...10, step: 1)
+                intStepper("Max reconnect attempts", value: $model.settings.maxReconnectAttempts, in: 1...10)
             }
 
             Section("Network") {
-                secondsStepper("API request timeout", value: $settings.apiTimeoutSeconds, in: 5...120, step: 5)
+                secondsStepper("API request timeout", value: $model.settings.apiTimeoutSeconds, in: 5...120, step: 5)
             }
 
             Section {
                 Button("Restore Defaults") {
-                    store.reset()
-                    settings = store.load()
+                    model.restoreDefaults()
                 }
             } footer: {
                 Text("Changes apply from the next stream start or reconnect.")
@@ -292,10 +290,12 @@ struct PlaybackSettingsTab: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            settings = store.load()
+            model.reload()
         }
-        .onChange(of: settings) { _, newValue in
-            store.save(newValue)
+        .onChange(of: model.settings) { _, _ in
+            // The model persists only genuine differences, so the round-trip
+            // from a remote adoption is a no-op instead of nine stale writes.
+            model.persist()
         }
     }
 
