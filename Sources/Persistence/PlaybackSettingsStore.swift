@@ -20,9 +20,19 @@ public struct PlaybackSettingsStore {
         self.storage = storage
     }
 
+    /// Always returns validated values: UserDefaults and iCloud KVS can carry
+    /// out-of-range, non-finite, or legacy data (other devices, other app
+    /// versions), and every consumer feeds these straight into timers, CMTime
+    /// and retry math. Normalized values are deliberately NOT written back —
+    /// rewriting on load would ping-pong with a remote device holding the
+    /// hostile value.
     public func load() -> PlaybackSettings {
         let fallback = PlaybackSettings.default
-        return PlaybackSettings(
+        return raw(fallback: fallback).validated()
+    }
+
+    private func raw(fallback: PlaybackSettings) -> PlaybackSettings {
+        PlaybackSettings(
             forwardBufferSeconds: double(Key.forwardBuffer) ?? fallback.forwardBufferSeconds,
             liveEdgeOffsetSeconds: double(Key.liveEdgeOffset) ?? fallback.liveEdgeOffsetSeconds,
             waitingTimeoutSeconds: double(Key.waitingTimeout) ?? fallback.waitingTimeoutSeconds,
