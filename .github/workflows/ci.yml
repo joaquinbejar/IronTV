@@ -142,3 +142,14 @@ jobs:
           fetch-depth: 0
       - name: Scan tracked files for credentials
         run: scripts/secret-scan.sh
+
+  docs-drift:
+    name: Docs drift
+    runs-on: ubuntu-latest
+    # README.md is the authoritative app description (issue #22). This gate
+    # fails when it, CLAUDE.md, or SPEC.md contradict project.yml on platform
+    # minimums, bundle id, or Swift version — the facts that rot silently.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs agree with project.yml
+        run: scripts/check-docs-drift.sh

@@ -1,6 +1,14 @@
 # SPEC — IronTV, macOS IPTV Player (Xtream Codes)
 
-App name: **IronTV** · Bundle ID: `com.quantkernel.irontv` · Xcode scheme: `IronTV`
+> **Historical document.** This is the original MVP design spec, kept for
+> context. The shipped app has moved past it — three platforms (macOS 14+,
+> iOS/iPadOS 17+, tvOS 17+), a VLC fallback engine on every platform,
+> TS-only panel support, iCloud preference sync, sample mode, and Spanish
+> localization. **`README.md` is the authoritative description of the app
+> as it exists.** Only factual constants below (bundle id, API shapes) are
+> kept corrected.
+
+App name: **IronTV** · Bundle ID: `com.taunais.irontv` · Xcode scheme: `IronTV`
 
 ## Goal
 
@@ -84,5 +92,5 @@ AVPlayer is the primary engine everywhere (hardware decode, AirPlay). On iOS/tvO
 ## Out of scope (MVP)
 - Full XMLTV EPG grid
 - Recording, timeshift
-- iOS/tvOS targets
+- iOS/tvOS targets *(shipped since — see the banner above; this list describes the original MVP cut only)*
 

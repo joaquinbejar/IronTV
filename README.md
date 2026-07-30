@@ -1,22 +1,29 @@
 # IronTV
 
-Native IPTV player for [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes) providers. SwiftUI, no third-party dependencies.
+Native IPTV player for [Xtream Codes](https://en.wikipedia.org/wiki/Xtream_Codes) providers. SwiftUI throughout; the one third-party dependency is VLCKit, pinned and dynamically linked (see [Dependencies](#dependencies)).
+
+**This README is the authoritative description of the shipped app.** `SPEC.md` is the historical MVP design document.
 
 | Platform | Status |
 |---|---|
-| macOS 13+ | ✅ Full support, notarized DMG |
-| iOS / iPadOS 16+ | ✅ Builds; UI adapted (settings as sheet) |
-| tvOS 16+ | ✅ Builds; UI adapted (focusable controls) |
+| macOS 14+ | ✅ Shipping — Mac App Store + notarized DMG |
+| iOS / iPadOS 17+ | ✅ Shipping — App Store (settings as sheet, compact-column navigation) |
+| tvOS 17+ | ✅ Shipping — App Store (focus-driven navigation) |
+
+On the App Store since 2026-07-17. English and Spanish localizations ship from one String Catalog (`Sources/Localizable.xcstrings`).
 
 ## Features
 
-- **One-URL setup** — paste the M3U playlist URL from your provider; the app extracts server and credentials, validates them against the panel, and stores them in the Keychain (synced across devices via iCloud Keychain). The M3U file itself is never downloaded.
-- **Channel browser** — categories sidebar, *All Channels* and *Favorites* scopes, per-channel icons, instant search.
-- **Resilient live playback** (AVPlayer, HLS):
-  - configurable forward buffer and live-edge cushion
+- **One-URL setup** — paste the M3U playlist URL from your provider; the app extracts server and credentials, validates them against the panel, and stores them in the device's data-protection Keychain. The M3U file itself is never downloaded. Preferences — favorites, last channel, playback settings — sync across devices via iCloud key-value store; the credentials themselves stay in the local Keychain (tvOS has no iCloud Keychain UI, so each device pastes the URL once).
+- **Sample mode** — "Try Sample Channels" browses and plays free legal public streams with no account, both as a first-run demo and as a recovery path when the stored account can't be read.
+- **Channel browser** — categories sidebar, *All Channels* and *Favorites* scopes, bounded per-channel icon loading, debounced diacritic-insensitive search that stays smooth on 50k-channel catalogs.
+- **Two playback engines on every platform** — AVPlayer (HLS) leads; the VLC engine (raw MPEG-TS) rescues channels AVPlayer can't decode, plays TS-only panels, and can be forced in Settings. The active engine is visible in the player.
+- **Resilient live playback**:
+  - configurable forward buffer and live-edge cushion (Apple engine)
   - stall watchdog: detects stuck buffering, frozen video (even while audio keeps playing), and dead streams; recovers via seek-to-live first, full reconnect second
+  - fast reconnects followed by an indefinite slower cadence — a live stream never gives up
   - manual audio/video resync button
-  - video-only full screen
+  - video-only full screen; floating always-on-top mini player on macOS
 - **Tunable playback settings** — synced via iCloud key-value store. Each option, its engine scope and trade-off:
 
   | Setting | Default | Range | Engine | Trade-off |
@@ -55,15 +62,19 @@ xcodebuild -scheme IronTV-tvOS -destination 'generic/platform=tvOS' CODE_SIGNING
 |------|---------------------------|--------------------|
 | macOS | 26.x | `macos-15` runner image |
 | Xcode | 26.6 | image default (Xcode 16.x) |
-| Swift | 6.3 (language mode 5) | image default |
+| Swift | 6.3 toolchain, **Swift 6 language mode** | image default |
 | XcodeGen | 2.46 | latest from Homebrew |
 
 CI regenerates the project from `project.yml` on every run and never caches the
 generated `.xcodeproj` or build products — a stale generated project is exactly
-what it exists to catch. It also runs a build and test pass on `macos-latest` and
-a `SWIFT_STRICT_CONCURRENCY=complete` pass, both **informational**: they surface a
-new Xcode or the outstanding concurrency-migration warnings (issue #17) without
-turning unrelated PRs red.
+what it exists to catch. Blocking gates: macOS build + tests, iOS and tvOS
+builds, a secret scan, a zero-warning pass over app **and test** sources
+(`build-for-testing`; isolation violations are compile errors in the Swift 6
+language mode, and this job keeps warnings from accumulating on top), and a
+docs-drift check (`scripts/check-docs-drift.sh`) that fails when this README,
+`CLAUDE.md`, or `SPEC.md` contradict `project.yml` on platforms, bundle id, or
+Swift version. A `macos-latest` pass stays **informational** so a new Xcode
+image surfaces as a warning instead of turning unrelated PRs red.
 
 ### Dependencies
 
@@ -83,7 +94,10 @@ Updating it is a reviewed change, not a routine bump:
 
 Adding any other dependency needs explicit approval first.
 
-### Distribution (macOS)
+### Distribution
+
+All three targets ship through App Store Connect (Xcode archive → upload).
+macOS additionally distributes as a notarized DMG:
 
 ```bash
 scripts/make-dmg.sh
@@ -116,14 +130,15 @@ IRONTV_NOTARIZE=0 scripts/make-dmg.sh
 
 ```
 Sources/
-  Domain/          # Account, Category, LiveStream, IDs, M3UURLParser, PlaybackSettings
-  API/             # XtreamClient (async), tolerant DTOs, credential redaction
+  Domain/          # Account, Category, LiveStream, IDs, M3UURLParser, PlaybackSettings, source planner
+  API/             # XtreamClient (async), tolerant DTOs, credential redaction, transport policies
   Persistence/     # KeychainStore, playback/favorites/last-channel stores, iCloud mirror
   Features/
     Settings/      # account entry + validation, playback tuning, license
-    Channels/      # category/channel browser
-    Player/        # AVPlayerView wrapper, stall watchdog, reconnect logic
-  App/             # app entry, root navigation
+    Channels/      # platform shells, channel browser, playback coordinator, icon pipeline
+    Player/        # player surfaces (AVPlayerView / VLC), stall watchdog, reconnect logic
+  App/             # app entry, root navigation, single-window policy
+  Localizable.xcstrings  # String Catalog (en source, es shipped)
 Tests/             # unit tests + JSON fixtures (Int/String variants, real panel captures)
 ```
 
