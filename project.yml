@@ -156,6 +156,9 @@ targets:
         CFBundleVersion: "19"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
+        # Single playback scene, same policy as iOS (issue #10).
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
     dependencies:
