@@ -47,6 +47,12 @@ public final class TeardownBag: @unchecked Sendable {
     }
 
     deinit {
+        // deinit has exclusive access by definition, but locking keeps the
+        // implementation aligned with the documented thread-safety contract.
+        lock.lock()
+        let observations = self.observations
+        let timer = self.timer
+        lock.unlock()
         observations.forEach { $0.center.removeObserver($0.token) }
         timer?.invalidate()
     }
