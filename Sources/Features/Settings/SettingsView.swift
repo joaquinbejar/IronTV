@@ -72,9 +72,6 @@ struct AccountSettingsTab: View {
     @EnvironmentObject private var appModel: AppModel
     @StateObject private var viewModel = SettingsViewModel()
     @Environment(\.scenePhase) private var scenePhase
-    /// The pasted URL contains the password, so it stays obscured until the user
-    /// asks to see it (to check a typo or a bad paste).
-    @State private var revealingURL = false
 
     var body: some View {
         Form {
@@ -124,7 +121,7 @@ struct AccountSettingsTab: View {
 
         HStack {
             Group {
-                if revealingURL {
+                if viewModel.isRevealingURL {
                     TextField("Playlist URL", text: $viewModel.urlText, prompt: prompt)
                 } else {
                     SecureField("Playlist URL", text: $viewModel.urlText, prompt: prompt)
@@ -144,16 +141,16 @@ struct AccountSettingsTab: View {
 
     @ViewBuilder
     private var revealToggle: some View {
-        let label = revealingURL ? "Hide playlist URL" : "Show playlist URL"
+        let label = viewModel.isRevealingURL ? "Hide playlist URL" : "Show playlist URL"
         #if os(tvOS)
         // The focus engine needs a real, labelled control here.
-        Button(revealingURL ? "Hide" : "Show") { revealingURL.toggle() }
+        Button(viewModel.isRevealingURL ? "Hide" : "Show") { viewModel.toggleURLReveal() }
             .accessibilityLabel(label)
         #else
         Button {
-            revealingURL.toggle()
+            viewModel.toggleURLReveal()
         } label: {
-            Image(systemName: revealingURL ? "eye.slash" : "eye")
+            Image(systemName: viewModel.isRevealingURL ? "eye.slash" : "eye")
         }
         .buttonStyle(.plain)
         .help(label)

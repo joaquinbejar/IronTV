@@ -298,6 +298,62 @@ final class SettingsViewModelTests: XCTestCase {
         }
     }
 
+    // MARK: - The reveal must not outlive the credential it exposes
+
+    func testRevealTogglesAndStartsHidden() {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        XCTAssertFalse(viewModel.isRevealingURL)
+        viewModel.toggleURLReveal()
+        XCTAssertTrue(viewModel.isRevealingURL)
+        viewModel.toggleURLReveal()
+        XCTAssertFalse(viewModel.isRevealingURL)
+    }
+
+    /// Otherwise the next URL the user pastes shows up in plain text.
+    func testASuccessfulSaveReHidesTheField() async {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.urlText = validURL
+        viewModel.toggleURLReveal()
+        await viewModel.validateAndSave(into: AppModel(store: FakeAccountStore()))
+
+        XCTAssertFalse(viewModel.isRevealingURL)
+    }
+
+    func testRemovingTheAccountReHidesTheField() {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.urlText = validURL
+        viewModel.toggleURLReveal()
+        viewModel.removeAccount(from: AppModel(store: FakeAccountStore()))
+
+        XCTAssertFalse(viewModel.isRevealingURL)
+    }
+
+    func testDismissalReHidesTheField() {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.urlText = validURL
+        viewModel.toggleURLReveal()
+        viewModel.formDismissed()
+
+        XCTAssertFalse(viewModel.isRevealingURL)
+    }
+
+    /// A rejected panel leaves the URL on screen to be corrected, so the reveal
+    /// the user asked for stays honored.
+    func testRejectionKeepsTheRevealTheUserChose() async {
+        let (viewModel, _) = makeViewModel(result: .success(rejected()))
+
+        viewModel.urlText = validURL
+        viewModel.toggleURLReveal()
+        await viewModel.validateAndSave(into: AppModel(store: FakeAccountStore()))
+
+        XCTAssertEqual(viewModel.urlText, validURL)
+        XCTAssertTrue(viewModel.isRevealingURL)
+    }
+
     func testCanSubmitRequiresNonEmptyTextAndNoRequestInFlight() async {
         let gate = Gate()
         let (viewModel, _) = makeViewModel(result: .success(authenticated()), gate: gate)

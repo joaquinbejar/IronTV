@@ -24,6 +24,11 @@ final class SettingsViewModel: ObservableObject {
     }
     @Published private(set) var phase: Phase = .idle
 
+    /// Whether the pasted URL is shown in the clear. It lives here rather than in
+    /// the view so it is reset together with the credential it exposes — a reveal
+    /// must never carry over to the next URL the user types or pastes.
+    @Published private(set) var isRevealingURL = false
+
     /// Builds the client that checks credentials against the panel. Injectable
     /// so tests can validate offline.
     typealias ClientFactory = @MainActor (Account, TimeInterval) -> AccountValidating
@@ -73,19 +78,24 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// Shows or hides the pasted URL. Reset by ``clearCredentialInput()``.
+    func toggleURLReveal() {
+        isRevealingURL.toggle()
+    }
+
     /// The form went away — sheet dismissed, tab left, or the app backgrounded
     /// (which can snapshot the window). Stop validating and drop the pasted URL
     /// rather than leave a password sitting in the field.
     func formDismissed() {
         cancelValidation()
-        urlText = ""
+        clearCredentialInput()
     }
 
     func removeAccount(from appModel: AppModel) {
         cancelValidation()
         // Cleared before the attempt, not after: a failed removal is no reason to
         // leave a pasted password on screen.
-        urlText = ""
+        clearCredentialInput()
         do {
             try appModel.removeAccount()
             phase = .idle
@@ -110,13 +120,20 @@ final class SettingsViewModel: ObservableObject {
             // Phase first: it takes urlText out of the validating state, so
             // clearing the field below doesn't cancel this completion.
             phase = .success(expiryDate: status.expiryDate)
-            urlText = ""
+            clearCredentialInput()
         } catch is CancellationError {
             return
         } catch {
             guard isStillCurrent(submitted) else { return }
             phase = .failure(errorMessage(for: error))
         }
+    }
+
+    /// Drops the credential-bearing text **and** re-hides it. Both belong together:
+    /// leaving the reveal on would show the next URL the user types in the clear.
+    private func clearCredentialInput() {
+        urlText = ""
+        isRevealingURL = false
     }
 
     /// A completion may only report back if it wasn't cancelled and the text it
