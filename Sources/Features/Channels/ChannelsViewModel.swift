@@ -20,7 +20,10 @@ final class ChannelsViewModel: ObservableObject {
             guard selectedCategory != oldValue else { return }
             lastChannel.lastCategory = selectedCategory
             selectedStreamID = nil
-            Task { await loadStreams() }
+            // Cancel the superseded load before starting the new one — a
+            // quick category switch must not leave big fetches and decodes
+            // running for a selection nobody is looking at.
+            restartStreamsLoad()
         }
     }
 
@@ -35,12 +38,24 @@ final class ChannelsViewModel: ObservableObject {
 
     @Published private(set) var favorites: Set<StreamID>
 
-    private let client: XtreamClient
+    private let client: ChannelBrowsing
     private let lastChannel: LastChannelStore
     private let favoritesStore: FavoritesStore
+    /// Main-actor-confined, like every other piece of this view model's state:
+    /// only retained tasks running on this actor read or write it, and every
+    /// write sits behind a current-selection guard.
     private var streamCache: [CategorySelection: [LiveStream]] = [:]
     /// Stream to re-select once its category's streams arrive (launch restore).
     private var pendingStreamRestore: StreamID?
+
+    /// Retained so superseded loads are cancelled instead of racing on: by a
+    /// selection change, a retry, or deinit. All `Sendable`, so deinit may
+    /// cancel them.
+    private var categoriesTask: Task<Void, Never>?
+    private var streamsTask: Task<Void, Never>?
+    /// Single in-flight fetch of the full channel list — All and Favorites
+    /// dedupe on it instead of issuing a second identical request.
+    private var allStreamsTask: Task<[LiveStream], Error>?
 
     /// True for the demo catalog: the screenshot env flag OR the user-facing
     /// "Sample channels" account.
@@ -50,16 +65,29 @@ final class ChannelsViewModel: ObservableObject {
     private let teardown = TeardownBag()
 
     /// `lastChannel` defaults to a store scoped to this account, so the browser
-    /// can never restore another provider's category or stream.
-    init(account: Account, lastChannel: LastChannelStore? = nil) {
+    /// can never restore another provider's category or stream. `client` and
+    /// `preferenceStorage` are injectable for offline tests; the defaults are
+    /// the real Xtream client and the synced store.
+    init(
+        account: Account,
+        lastChannel: LastChannelStore? = nil,
+        client: ChannelBrowsing? = nil,
+        preferenceStorage: KeyValueStorage = SyncedStorage.shared
+    ) {
         let settings = PlaybackSettingsStore().load()
-        self.client = XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
-        self.lastChannel = lastChannel ?? LastChannelStore(identity: account.identity)
-        self.favoritesStore = FavoritesStore(account: account)
+        self.client = client ?? XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
+        self.lastChannel = lastChannel ?? LastChannelStore(identity: account.identity, storage: preferenceStorage)
+        self.favoritesStore = FavoritesStore(account: account, storage: preferenceStorage)
         self.isDemo = DemoMode.isActive || account == DemoMode.account
         self.favorites = isDemo ? DemoMode.favoriteIDs : favoritesStore.load()
         observeFavoritesSync()
-        Task { await loadCategories() }
+        categoriesTask = makeCategoriesLoadTask()
+    }
+
+    deinit {
+        categoriesTask?.cancel()
+        streamsTask?.cancel()
+        allStreamsTask?.cancel()
     }
 
     /// Picks up favorites toggled on another device while this screen is open.
@@ -75,7 +103,12 @@ final class ChannelsViewModel: ObservableObject {
         ) { [weak self] notification in
             let changed = notification.userInfo?[SyncedStorage.changedKeysUserInfoKey] as? [String] ?? []
             guard changed.contains(key) else { return }
-            Task { @MainActor [weak self] in self?.adoptRemoteFavorites() }
+            // Delivered on the main queue (SyncedStorage posts there), so the
+            // hop onto the actor is an assertion, not a detached task that
+            // could outlive or race the view model.
+            MainActor.assumeIsolated {
+                self?.adoptRemoteFavorites()
+            }
         })
     }
 
@@ -132,74 +165,201 @@ final class ChannelsViewModel: ObservableObject {
         return try? client.playbackURL(for: streamID, format: .ts)
     }
 
+    /// Public entry points cancel the superseded load, retain the new task,
+    /// and await it — so view code keeps its `await` call sites while every
+    /// in-flight load stays cancellable.
+    ///
+    /// Every load is two-phase: a brief strong window on the actor to plan
+    /// (phase flips, cache checks) and to apply the result — while the fetch
+    /// itself holds only the client. An in-flight request therefore never
+    /// pins the view model: release the browser and the loads die with it.
     func loadCategories() async {
+        categoriesTask?.cancel()
+        let task = makeCategoriesLoadTask()
+        categoriesTask = task
+        await task.value
+    }
+
+    func loadStreams(bypassCache: Bool = false) async {
+        let task = restartStreamsLoad(bypassCache: bypassCache)
+        await task.value
+    }
+
+    private func makeCategoriesLoadTask() -> Task<Void, Never> {
+        Task { [weak self] () -> Void in
+            // A waiter cancelled before it ever ran must not plan or fetch.
+            guard !Task.isCancelled, let fetch = self?.beginCategoriesLoad() else { return }
+            let result: Result<[Category], Error>
+            do {
+                result = .success(try await withTaskCancellationHandler {
+                    try await fetch.value
+                } onCancel: {
+                    fetch.cancel()
+                })
+            } catch {
+                result = .failure(error)
+            }
+            self?.finishCategoriesLoad(result)
+        }
+    }
+
+    /// nil = handled synchronously (demo catalog); otherwise the detached
+    /// fetch to await without retaining the view model.
+    private func beginCategoriesLoad() -> Task<[Category], Error>? {
         if isDemo {
             categories = DemoMode.categories
             categoriesPhase = .loaded
-            return
+            return nil
         }
         categoriesPhase = .loading
-        do {
-            categories = try await client.liveCategories()
+        let client = self.client
+        // Detached: the wrapper frames must not be scheduled on the main actor
+        // (the client's nonisolated async work already runs off it).
+        return Task.detached { try await client.liveCategories() }
+    }
+
+    private func finishCategoriesLoad(_ result: Result<[Category], Error>) {
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success(let fetched):
+            categories = fetched
             categoriesPhase = .loaded
             restoreLastChannelIfPossible()
-        } catch {
+        case .failure(let error):
+            // Cancellation is a state transition, not a user-facing failure.
+            guard !Self.isCancellation(error) else { return }
             categoriesPhase = .failed(errorMessage(for: error))
         }
     }
 
-    func loadStreams(bypassCache: Bool = false) async {
-        guard let selection = selectedCategory else {
+    @discardableResult
+    private func restartStreamsLoad(bypassCache: Bool = false) -> Task<Void, Never> {
+        streamsTask?.cancel()
+        // Captured now: the task plans for the selection that requested it,
+        // never for whatever the selection has become by the time it runs.
+        let intended = selectedCategory
+        let task = Task { [weak self] () -> Void in
+            // A waiter cancelled before it ever ran must not plan or fetch —
+            // a rapid A→B→A switch would otherwise hit the provider once per
+            // superseded waiter.
+            guard !Task.isCancelled,
+                  let plan = self?.beginStreamsLoad(for: intended, bypassCache: bypassCache) else { return }
+            guard case .fetch(let selection, let fetch, let exclusive) = plan else { return }
+            let result: Result<[LiveStream], Error>
+            do {
+                result = .success(try await withTaskCancellationHandler {
+                    try await fetch.value
+                } onCancel: {
+                    // The shared full-list fetch may have other waiters — it
+                    // is only torn down by deinit, never by one stale waiter.
+                    if exclusive { fetch.cancel() }
+                })
+            } catch {
+                result = .failure(error)
+            }
+            self?.finishStreamsLoad(result, for: selection)
+        }
+        streamsTask = task
+        return task
+    }
+
+    private enum StreamsLoadPlan {
+        /// Answered synchronously: empty selection, demo catalog, or cache.
+        case served
+        /// Await this fetch, then apply for the given selection. `exclusive`
+        /// is false for the shared full-list task, which other loads may be
+        /// awaiting too.
+        case fetch(CategorySelection, Task<[LiveStream], Error>, exclusive: Bool)
+    }
+
+    private func beginStreamsLoad(for intended: CategorySelection?, bypassCache: Bool) -> StreamsLoadPlan {
+        // Superseded before it started (the didSet cancel should have caught
+        // it, but the guard costs nothing and closes the race).
+        guard intended == selectedCategory else { return .served }
+        guard let selection = intended else {
             streams = []
             streamsPhase = .loaded
-            return
+            return .served
         }
         if isDemo {
             streams = DemoMode.streams(in: selection)
             streamsPhase = .loaded
             applyPendingStreamRestore()
-            return
+            return .served
         }
         if !bypassCache, selection != .favorites, let cached = streamCache[selection] {
             streams = cached
             streamsPhase = .loaded
             applyPendingStreamRestore()
-            return
+            return .served
         }
         streamsPhase = .loading
-        do {
-            let fetched: [LiveStream]
-            switch selection {
-            case .all:
-                fetched = try await allStreams(bypassCache: bypassCache)
-            case .favorites:
-                // Favorites are a filter over the full channel list.
-                fetched = try await allStreams(bypassCache: bypassCache)
-                    .filter { favorites.contains($0.id) }
-            case .category(let categoryID):
-                fetched = try await client.liveStreams(in: categoryID)
+        let client = self.client
+        switch selection {
+        case .all, .favorites:
+            if !bypassCache, selection == .favorites, let cached = streamCache[.all] {
+                finishStreamsLoad(.success(cached), for: selection)
+                return .served
             }
-            // Ignore stale responses after a quick category switch.
-            guard selectedCategory == selection else { return }
+            // The full channel list is fetched at most once at a time: a
+            // Favorites load arriving while All is still fetching awaits the
+            // same task instead of issuing a second identical request.
+            if !bypassCache, let inFlight = allStreamsTask, !inFlight.isCancelled {
+                return .fetch(selection, inFlight, exclusive: false)
+            }
+            let task = Task.detached { try await client.liveStreams(in: nil) }
+            allStreamsTask = task
+            return .fetch(selection, task, exclusive: false)
+        case .category(let categoryID):
+            return .fetch(selection, Task.detached { try await client.liveStreams(in: categoryID) }, exclusive: true)
+        }
+    }
+
+    private func finishStreamsLoad(_ result: Result<[LiveStream], Error>, for selection: CategorySelection) {
+        switch result {
+        case .success(let fetched):
+            // The shared full list is cacheable regardless of which selection
+            // is current — the next All/Favorites visit serves from it.
+            if selection == .all || selection == .favorites {
+                streamCache[.all] = fetched
+                // The cache is the source of truth now — dropping the completed
+                // task releases its retained copy of the catalog.
+                allStreamsTask = nil
+            }
+            // Only the current selection may update phases, the visible list,
+            // or the per-category cache — stale responses are dropped.
+            guard selectedCategory == selection, !Task.isCancelled else { return }
+            let visible: [LiveStream]
+            if selection == .favorites {
+                visible = fetched.filter { favorites.contains($0.id) }
+            } else {
+                visible = fetched
+            }
             if case .category = selection {
                 streamCache[selection] = fetched
             }
-            streams = fetched
+            streams = visible
             streamsPhase = .loaded
             applyPendingStreamRestore()
-        } catch {
+        case .failure(let error):
+            // A failed shared fetch must not be reused by the next load.
+            if selection == .all || selection == .favorites {
+                allStreamsTask = nil
+            }
+            guard !Self.isCancellation(error), !Task.isCancelled else { return }
             guard selectedCategory == selection else { return }
             streamsPhase = .failed(errorMessage(for: error))
         }
     }
 
-    private func allStreams(bypassCache: Bool) async throws -> [LiveStream] {
-        if !bypassCache, let cached = streamCache[.all] {
-            return cached
-        }
-        let fetched = try await client.liveStreams(in: nil)
-        streamCache[.all] = fetched
-        return fetched
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        // Both shapes reach here: the client wraps URLSession's error in
+        // XtreamAPIError.network, but a ChannelBrowsing conformer may throw
+        // the raw URLError directly.
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+        if case XtreamAPIError.network(let urlError) = error, urlError.code == .cancelled { return true }
+        return false
     }
 
     private func restoreLastChannelIfPossible() {
