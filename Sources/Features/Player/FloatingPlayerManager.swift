@@ -27,9 +27,12 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
     private var observers: [NSObjectProtocol] = []
     private static let frameAutosaveName = "IronTVFloatingPlayer"
 
-    deinit {
-        observers.forEach(NotificationCenter.default.removeObserver)
-    }
+    // No deinit: observers exist only while floating and are torn down by
+    // `stopObserving()` on every exit path. Removing them from a nonisolated
+    // deinit would touch non-Sendable tokens off the actor — a strict-concurrency
+    // warning that becomes an error under Swift 6 (see issue #17). Each block
+    // captures `self` weakly, so a token that ever did outlive the manager would
+    // fire into nothing.
 
     /// Called by the browser as its window becomes known, so entering floating
     /// mode never has to guess which window to hide.
@@ -46,7 +49,9 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
         }
     }
 
-    func exitIfNeeded(viewModel: PlayerViewModel) {
+    /// The view model is tracked from ``enter(viewModel:)``, so the parameter is
+    /// kept for the call site only.
+    func exitIfNeeded(viewModel _: PlayerViewModel) {
         if isFloating {
             cleanUp(restoringSource: true)
         }
@@ -109,7 +114,12 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
     /// The single exit. Idempotent, so it is safe from any close path and safe to
     /// run twice — a Cmd-W that lands during the exit button's own teardown does
     /// nothing the second time.
-    private func cleanUp(restoringSource: Bool) {
+    ///
+    /// `rebuildingSurface` is false on the termination path only. Rebuilding the
+    /// VLC surface restarts playback (`videoSurfaceGeometryChanged()` →
+    /// `startVLCPlayback`), which while quitting would open a fresh connection to
+    /// the provider instead of winding down.
+    private func cleanUp(restoringSource: Bool, rebuildingSurface: Bool = true) {
         let floating = window
         window = nil
         stopObserving()
@@ -129,7 +139,9 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
         isFloating = false
 
         #if canImport(VLCKitSPM)
-        activeViewModel?.videoSurfaceGeometryChanged()
+        if rebuildingSurface {
+            activeViewModel?.videoSurfaceGeometryChanged()
+        }
         #endif
         activeViewModel = nil
     }
@@ -160,7 +172,11 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.cleanUp(restoringSource: true) }
+            // Restore and persist state, but do not rebuild the video surface —
+            // that would restart playback on the way out.
+            MainActor.assumeIsolated {
+                self?.cleanUp(restoringSource: true, rebuildingSurface: false)
+            }
         })
 
         guard let source else { return }
@@ -169,9 +185,18 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
             object: source,
             queue: .main
         ) { [weak self] _ in
-            // The window we hid is going away, so there is nothing to restore.
-            // Keep the floating player up rather than leaving no window at all.
-            MainActor.assumeIsolated { self?.sourceWindow = nil }
+            // The window we hid is going away. Exit floating rather than keep a
+            // stream — and the provider's connection slot — alive with no owning
+            // view. There is nothing to restore, so clearing the reference first
+            // makes cleanUp fall back to whatever window remains. This is also
+            // what the browser's own onDisappear does, so the two paths agree
+            // instead of fighting; cleanUp is idempotent, so whichever runs
+            // second is a no-op.
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.sourceWindow = nil
+                self.cleanUp(restoringSource: true)
+            }
         })
     }
 

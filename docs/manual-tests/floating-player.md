@@ -29,10 +29,10 @@ original browser window comes back and takes focus, the toolbar button reads as
       Settings, and Settings must stay on screen.
 - [ ] With Settings open and focused, enter floating mode from the browser's
       toolbar. Exiting must restore the browser.
-- [ ] Close the **browser** window while floating. The floating player must keep
-      playing and must not crash. Exiting afterwards must not leave the app with
-      no window: either a remaining window comes forward, or the app can be
-      reopened from the Dock.
+- [ ] Close the **browser** window while floating. The floating player must close
+      with it and playback must stop, so the provider's connection slot is
+      released rather than held by a stream with no owning view. If another window
+      remains it comes forward; otherwise the app can be reopened from the Dock.
 
 ## Spaces and full screen
 
