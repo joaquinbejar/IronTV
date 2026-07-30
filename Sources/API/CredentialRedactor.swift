@@ -21,11 +21,21 @@ public enum CredentialRedactor {
             }
         }
 
-        var segments = components.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        // Split the *encoded* path: a credential slash is %2F there, not a
+        // separator, so the segment structure is authoritative and redaction
+        // cannot depend on decoded slash boundaries.
+        var segments = components.percentEncodedPath.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         if segments.count >= 3, credentialPathPrefixes.contains(segments[0].lowercased()) {
-            segments[1] = mask
-            segments[2] = mask
-            components.path = "/" + segments.joined(separator: "/")
+            if segments.count >= 4 {
+                // Keep the prefix and the stream file, and collapse everything
+                // between into exactly two masks — that also swallows the extra
+                // segments a legacy URL built from a slashed credential grew.
+                segments = [segments[0], mask, mask, segments[segments.count - 1]]
+            } else {
+                segments[1] = mask
+                segments[2] = mask
+            }
+            components.percentEncodedPath = "/" + segments.joined(separator: "/")
         }
 
         return components.string ?? "<unparseable url>"
