@@ -3,7 +3,8 @@ import XCTest
 
 final class AccountPreferenceMigratorTests: XCTestCase {
     private var defaults: UserDefaults!
-    private let suiteName = "AccountPreferenceMigratorTests"
+    // Unique per test instance, so parallel or repeated runs can't share state.
+    private let suiteName = "AccountPreferenceMigratorTests.\(UUID().uuidString)"
 
     private let httpAccount = Account(
         host: URL(string: "http://host.example.com:8080")!,
