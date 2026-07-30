@@ -8,8 +8,11 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Clean build so a stale incremental Release can't ship an old Info.plist.
 echo "Building Release…"
+# -allowProvisioningUpdates: the keychain-access-groups entitlement is
+# restricted, so the app needs an embedded provisioning profile.
 xcodebuild -project "$REPO/IronTV.xcodeproj" -scheme IronTV -configuration Release \
-    -destination 'generic/platform=macOS' ONLY_ACTIVE_ARCH=NO clean build -quiet
+    -destination 'generic/platform=macOS' ONLY_ACTIVE_ARCH=NO \
+    -allowProvisioningUpdates clean build -quiet
 
 APP=$(ls -d "$HOME"/Library/Developer/Xcode/DerivedData/IronTV-*/Build/Products/Release/IronTV.app 2>/dev/null | head -1)
 if [[ -z "${APP:-}" ]]; then

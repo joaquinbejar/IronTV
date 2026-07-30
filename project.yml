@@ -41,8 +41,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Flip to true once the iCloud KVS entitlement is provisioned.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1"
-        CFBundleVersion: "17"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "18"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.video
@@ -57,6 +57,12 @@ targets:
         # allows outgoing connections to the IPTV server and sample streams.
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        # Opts the app into the data-protection Keychain (see KeychainStore).
+        # The legacy file-based login Keychain binds items to an ACL owned by
+        # the signature that created them, so a differently-signed build hits
+        # errSecInvalidOwnerEdit (-25244) when overwriting the account.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.taunais.irontv
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
@@ -82,8 +88,8 @@ targets:
         # iCloud settings-sync deferred to a 1.1 update (needs the App ID's
         # iCloud container fully provisioned); off for the 1.0 submission.
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1"
-        CFBundleVersion: "17"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "18"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
@@ -124,8 +130,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1"
-        CFBundleVersion: "17"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "18"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
