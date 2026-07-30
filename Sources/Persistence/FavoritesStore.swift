@@ -4,19 +4,21 @@ import Foundation
 /// providers doesn't mix stream IDs. UserDefaults-backed preference data.
 public struct FavoritesStore {
     private let storage: KeyValueStorage
-    private let key: String
+    /// Exposed so screens can tell whether an iCloud change touched favorites
+    /// (see `SyncedStorage.didChangeExternallyNotification`).
+    public let storageKey: String
 
     public init(account: Account, storage: KeyValueStorage = SyncedStorage.shared) {
         self.storage = storage
-        self.key = "favorites.\(account.host.absoluteString).\(account.username)"
+        self.storageKey = "favorites.\(account.host.absoluteString).\(account.username)"
     }
 
     public func load() -> Set<StreamID> {
-        let raw = storage.array(forKey: key) as? [Int] ?? []
+        let raw = storage.array(forKey: storageKey) as? [Int] ?? []
         return Set(raw.map { StreamID($0) })
     }
 
     public func save(_ favorites: Set<StreamID>) {
-        storage.set(favorites.map(\.rawValue).sorted(), forKey: key)
+        storage.set(favorites.map(\.rawValue).sorted(), forKey: storageKey)
     }
 }

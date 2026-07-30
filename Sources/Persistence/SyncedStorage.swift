@@ -21,6 +21,12 @@ extension UserDefaults: KeyValueStorage {}
 public final class SyncedStorage: KeyValueStorage {
     public static let shared = SyncedStorage()
 
+    /// Posted on the main queue after an iCloud-originated change has been
+    /// folded into UserDefaults, so open screens can re-read their values.
+    /// `userInfo[changedKeysUserInfoKey]` holds the affected keys.
+    public static let didChangeExternallyNotification = Notification.Name("IronTVSyncedStorageDidChangeExternally")
+    public static let changedKeysUserInfoKey = "changedKeys"
+
     private let defaults: UserDefaults
     /// nil until the iCloud KVS entitlement is provisioned — touching
     /// NSUbiquitousKeyValueStore without it logs "BUG IN CLIENT OF KVS"
@@ -55,11 +61,15 @@ public final class SyncedStorage: KeyValueStorage {
     }
 
     public func object(forKey defaultName: String) -> Any? {
-        defaults.object(forKey: defaultName)
+        let local = defaults.object(forKey: defaultName)
+        seedCloudIfEmpty(defaultName, local: local)
+        return local
     }
 
     public func array(forKey defaultName: String) -> [Any]? {
-        defaults.array(forKey: defaultName)
+        let local = defaults.array(forKey: defaultName)
+        seedCloudIfEmpty(defaultName, local: local)
+        return local
     }
 
     public func set(_ value: Any?, forKey defaultName: String) {
@@ -74,9 +84,22 @@ public final class SyncedStorage: KeyValueStorage {
         cloud?.synchronize()
     }
 
+    /// First launch after sync is enabled: iCloud holds nothing for a key this
+    /// device already has. Push it up on read, so pre-sync favorites and
+    /// settings reach the other devices without waiting for the user to change
+    /// them. Reads are the only hook that names the keys the app actually uses
+    /// — mirroring all of UserDefaults would ship unrelated state.
+    private func seedCloudIfEmpty(_ key: String, local: Any?) {
+        guard let cloud, let local, cloud.object(forKey: key) == nil else { return }
+        cloud.set(local, forKey: key)
+        cloud.synchronize()
+    }
+
     private func applyExternalChanges(_ notification: Notification) {
         guard let cloud else { return }
         let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
+        guard !changedKeys.isEmpty else { return }
+
         for key in changedKeys {
             if let value = cloud.object(forKey: key) {
                 defaults.set(value, forKey: key)
@@ -84,6 +107,12 @@ public final class SyncedStorage: KeyValueStorage {
                 defaults.removeObject(forKey: key)
             }
         }
+
+        NotificationCenter.default.post(
+            name: Self.didChangeExternallyNotification,
+            object: self,
+            userInfo: [Self.changedKeysUserInfoKey: changedKeys]
+        )
     }
 
     deinit {

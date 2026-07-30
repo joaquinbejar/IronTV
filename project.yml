@@ -39,10 +39,10 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        # Flip to true once the iCloud KVS entitlement is provisioned.
-        IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "18"
+        # Mirrors favorites/last channel/playback settings via iCloud KVS.
+        IronTVCloudKVSEnabled: true
+        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "19"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.video
@@ -63,6 +63,9 @@ targets:
         # errSecInvalidOwnerEdit (-25244) when overwriting the account.
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.taunais.irontv
+        # iCloud key-value store: favorites, last channel and playback
+        # settings follow the user across devices (see SyncedStorage).
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
@@ -85,11 +88,10 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        # iCloud settings-sync deferred to a 1.1 update (needs the App ID's
-        # iCloud container fully provisioned); off for the 1.0 submission.
-        IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "18"
+        # Mirrors favorites/last channel/playback settings via iCloud KVS.
+        IronTVCloudKVSEnabled: true
+        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "19"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
@@ -106,6 +108,10 @@ targets:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
+    entitlements:
+      path: Sources/IronTV-iOS.entitlements
+      properties:
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv
@@ -129,15 +135,19 @@ targets:
       properties:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
-        IronTVCloudKVSEnabled: false
-        CFBundleShortVersionString: "1.1.1"
-        CFBundleVersion: "18"
+        IronTVCloudKVSEnabled: true
+        CFBundleShortVersionString: "1.1.2"
+        CFBundleVersion: "19"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
     dependencies:
       - package: VLCKitSPM
+    entitlements:
+      path: Sources/IronTV-tvOS.entitlements
+      properties:
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.taunais.irontv

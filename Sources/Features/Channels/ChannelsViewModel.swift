@@ -45,6 +45,7 @@ final class ChannelsViewModel: ObservableObject {
     /// True for the demo catalog: the screenshot env flag OR the user-facing
     /// "Sample channels" account.
     private let isDemo: Bool
+    private var favoritesSyncObserver: NSObjectProtocol?
 
     init(account: Account, lastChannel: LastChannelStore = LastChannelStore()) {
         let settings = PlaybackSettingsStore().load()
@@ -53,7 +54,38 @@ final class ChannelsViewModel: ObservableObject {
         self.favoritesStore = FavoritesStore(account: account)
         self.isDemo = DemoMode.isActive || account == DemoMode.account
         self.favorites = isDemo ? DemoMode.favoriteIDs : favoritesStore.load()
+        observeFavoritesSync()
         Task { await loadCategories() }
+    }
+
+    deinit {
+        if let favoritesSyncObserver {
+            NotificationCenter.default.removeObserver(favoritesSyncObserver)
+        }
+    }
+
+    /// Picks up favorites toggled on another device while this screen is open.
+    /// iCloud KVS is last-writer-wins per key, so the remote value replaces
+    /// ours wholesale — that's what makes removals propagate.
+    private func observeFavoritesSync() {
+        guard !isDemo else { return }
+        let key = favoritesStore.storageKey
+        favoritesSyncObserver = NotificationCenter.default.addObserver(
+            forName: SyncedStorage.didChangeExternallyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let changed = notification.userInfo?[SyncedStorage.changedKeysUserInfoKey] as? [String] ?? []
+            guard changed.contains(key) else { return }
+            Task { @MainActor [weak self] in self?.adoptRemoteFavorites() }
+        }
+    }
+
+    private func adoptRemoteFavorites() {
+        let remote = favoritesStore.load()
+        guard remote != favorites else { return }
+        favorites = remote
+        refreshFavoritesListIfShown()
     }
 
     func isFavorite(_ streamID: StreamID) -> Bool {
@@ -67,10 +99,13 @@ final class ChannelsViewModel: ObservableObject {
             favorites.insert(streamID)
         }
         favoritesStore.save(favorites)
-        // The favorites list reflects removals immediately.
-        if selectedCategory == .favorites, let all = streamCache[.all] {
-            streams = all.filter { favorites.contains($0.id) }
-        }
+        refreshFavoritesListIfShown()
+    }
+
+    /// The favorites list reflects removals immediately.
+    private func refreshFavoritesListIfShown() {
+        guard selectedCategory == .favorites, let all = streamCache[.all] else { return }
+        streams = all.filter { favorites.contains($0.id) }
     }
 
     var filteredStreams: [LiveStream] {
