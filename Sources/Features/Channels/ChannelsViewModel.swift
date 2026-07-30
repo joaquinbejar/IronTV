@@ -54,10 +54,12 @@ final class ChannelsViewModel: ObservableObject {
     /// cancel them.
     private var categoriesTask: Task<Void, Never>?
     private var streamsTask: Task<Void, Never>?
-    /// Formats the panel advertises for this account (nil until known or when
-    /// the panel doesn't say — both classic formats are assumed then).
-    private var allowedFormats: Set<StreamOutputFormat>?
-    private var capabilitiesTask: Task<Void, Never>?
+    /// Resolves to the formats the panel advertises (nil when the panel
+    /// doesn't say, or the fetch failed — both classic formats are assumed
+    /// then). Pending is modeled by the task itself: `playbackPlan` awaits it,
+    /// so a selection made before capabilities arrive can never plan against
+    /// the wrong assumption. nil task = demo mode (no fetch).
+    private var capabilitiesTask: Task<Set<StreamOutputFormat>?, Never>?
     /// Single in-flight fetch of the full channel list — All and Favorites
     /// dedupe on it instead of issuing a second identical request.
     private var allStreamsTask: Task<[LiveStream], Error>?
@@ -89,15 +91,14 @@ final class ChannelsViewModel: ObservableObject {
         observeFavoritesSync()
         categoriesTask = makeCategoriesLoadTask()
         if !isDemo {
-            capabilitiesTask = Task { [weak self] () -> Void in
-                guard let fetch = self?.makeCapabilitiesFetch() else { return }
+            capabilitiesTask = Task { [weak self] () -> Set<StreamOutputFormat>? in
+                guard let fetch = self?.makeCapabilitiesFetch() else { return nil }
                 let status = try? await withTaskCancellationHandler {
                     try await fetch.value
                 } onCancel: {
                     fetch.cancel()
                 }
-                guard let self, !Task.isCancelled, let status else { return }
-                self.allowedFormats = status.allowedOutputFormats
+                return status?.allowedOutputFormats
             }
         }
     }
@@ -195,13 +196,16 @@ final class ChannelsViewModel: ObservableObject {
     }
 
     /// Deterministic source selection: HLS when advertised, TS when
-    /// advertised (also the VLC fallback), a trusted same-host direct source
-    /// last. A panel advertising nothing playable surfaces a typed error
-    /// instead of a doomed connection attempt.
-    func playbackPlan(for streamID: StreamID) throws -> PlaybackPlan {
+    /// advertised (also the VLC fallback), a trusted same-origin direct
+    /// source last. Awaits the capabilities fetch, so a channel selected
+    /// before the panel answered still plans against what it actually
+    /// advertises — a TS-only panel never gets a doomed AVPlayer attempt.
+    /// A panel advertising nothing playable surfaces a typed error.
+    func playbackPlan(for streamID: StreamID) async throws -> PlaybackPlan {
         if isDemo {
             return PlaybackPlan(primaryURL: try playbackURL(for: streamID), tsURL: nil, hlsAvailable: true)
         }
+        let allowedFormats = await capabilitiesTask?.value ?? nil
         let stream = streams.first { $0.id == streamID } ?? streamCache[.all]?.first { $0.id == streamID }
         let selection = PlaybackSourcePlanner.plan(
             directSource: stream?.directSourceURL,
