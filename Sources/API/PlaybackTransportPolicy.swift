@@ -35,6 +35,13 @@ public enum PlaybackTransportPolicy {
         if SameOriginRedirectPolicy.allowsRedirect(from: plannedOrigin, to: observed) {
             return .acceptable
         }
+        // A same-host scheme upgrade (http planned, https observed) is a
+        // hardening move, not a violation — ports may legitimately differ
+        // across the upgrade (8080 → 443), so only the host is compared.
+        if plannedOrigin.scheme?.lowercased() == "http", scheme == "https",
+           observed.host?.lowercased() == plannedOrigin.host?.lowercased() {
+            return .acceptable
+        }
         if plannedOrigin.scheme?.lowercased() == "https", observed.scheme?.lowercased() == "http" {
             return .downgraded
         }

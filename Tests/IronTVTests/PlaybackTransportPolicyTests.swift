@@ -17,6 +17,14 @@ final class PlaybackTransportPolicyTests: XCTestCase {
         XCTAssertEqual(verdict("https://host.example.com:443/x.ts", origin: URL(string: "https://host.example.com/1.m3u8")!), .acceptable)
     }
 
+    /// The reverse of the downgrade: moving to https on the same host is a
+    /// hardening upgrade and must not stop playback.
+    func testSameHostSchemeUpgradeIsAcceptable() {
+        XCTAssertEqual(verdict("https://host.example.com/segments/1.ts", origin: httpOrigin), .acceptable)
+        XCTAssertEqual(verdict("https://host.example.com:8443/1.ts", origin: httpOrigin), .acceptable)
+        XCTAssertEqual(verdict("https://cdn.example.org/1.ts", origin: httpOrigin), .crossOrigin, "an upgrade to another host is still cross-origin")
+    }
+
     func testHTTPSDowngradeIsDetected() {
         XCTAssertEqual(verdict("http://host.example.com:8443/segments/1.ts", origin: httpsOrigin), .downgraded)
     }
