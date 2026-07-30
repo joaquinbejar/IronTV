@@ -105,6 +105,9 @@ struct PlayerView: View {
     /// appears when the interruption lasts longer than this.
     private static let overlayDelay: UInt64 = 1_500_000_000
     @State private var showTransientOverlay = false
+    /// Auto-hiding engine badge for chrome-less surfaces (tvOS player screen,
+    /// full-screen) where the toolbar chip is unreachable.
+    @State private var showEngineBadge = false
 
     private var core: some View {
         ZStack {
@@ -134,6 +137,29 @@ struct PlayerView: View {
             case .failed(let message):
                 errorOverlay(message)
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if showEngineBadge, viewModel.currentStream != nil {
+                Text(viewModel.engine == .vlc ? "VLC engine" : "Apple engine")
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(12)
+                    .accessibilityLabel(viewModel.engine == .vlc ? "Playing with the VLC engine" : "Playing with the Apple engine")
+            }
+        }
+        .task(id: EngineBadgeKey(engine: viewModel.engine, generation: viewModel.playbackGeneration)) {
+            // Chrome-less surfaces have no toolbar chip: show the active
+            // engine briefly on every session/engine change, then fade out.
+            guard chromeHidden, viewModel.currentStream != nil else {
+                showEngineBadge = false
+                return
+            }
+            showEngineBadge = true
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            showEngineBadge = false
         }
         .task(id: viewModel.state) {
             // Bound to the exact transition: every state change cancels the
@@ -202,5 +228,12 @@ struct PlayerView: View {
 /// cancels the previous delay via `.task(id:)`.
 private struct GeometryRestartKey: Equatable {
     let chromeHidden: Bool
+    let generation: UInt64
+}
+
+/// Identity for the auto-hiding engine badge: re-shown on every engine or
+/// session change.
+private struct EngineBadgeKey: Equatable {
+    let engine: PlayerViewModel.Engine
     let generation: UInt64
 }
