@@ -77,8 +77,10 @@ final class PlayerViewModel: ObservableObject {
     private var statusObservation: NSKeyValueObservation?
     private var timeControlObservation: NSKeyValueObservation?
     private var keepUpObservation: NSKeyValueObservation?
-    private var notificationObservers: [NSObjectProtocol] = []
-    private var watchdog: Timer?
+    /// Owns the AVPlayerItem observer tokens and the watchdog timer; tears
+    /// them down on release so no nonisolated deinit has to touch
+    /// non-Sendable state.
+    private let teardown = TeardownBag()
     private var lastObservedTime: CMTime = .zero
     private var frozenSeconds: TimeInterval = 0
     private var waitingSince: Date?
@@ -179,8 +181,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func stop() {
-        watchdog?.invalidate()
-        watchdog = nil
+        teardown.setTimer(nil)
         stopVLC()
         engine = .avPlayer
         replacePlayer() // disposes the old (possibly wedged) player off-main
@@ -259,7 +260,7 @@ final class PlayerViewModel: ObservableObject {
         }
 
         removeNotificationObservers()
-        notificationObservers.append(NotificationCenter.default.addObserver(
+        teardown.store(NotificationCenter.default.addObserver(
             forName: AVPlayerItem.playbackStalledNotification,
             object: item,
             queue: .main
@@ -275,7 +276,7 @@ final class PlayerViewModel: ObservableObject {
             }
         })
         // Corrupted or truncated live segments can make the item "end".
-        notificationObservers.append(NotificationCenter.default.addObserver(
+        teardown.store(NotificationCenter.default.addObserver(
             forName: AVPlayerItem.failedToPlayToEndTimeNotification,
             object: item,
             queue: .main
@@ -288,8 +289,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func removeNotificationObservers() {
-        notificationObservers.forEach(NotificationCenter.default.removeObserver(_:))
-        notificationObservers = []
+        teardown.removeObservers()
     }
 
     /// Xtream panels keep a tiny live window (often ~30s of segments). A
@@ -311,12 +311,12 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Reconnect watchdog
 
     private func startWatchdog() {
-        watchdog?.invalidate()
-        watchdog = Timer.scheduledTimer(withTimeInterval: settings.watchdogIntervalSeconds, repeats: true) { [weak self] _ in
+        // setTimer invalidates the previous watchdog.
+        teardown.setTimer(Timer.scheduledTimer(withTimeInterval: settings.watchdogIntervalSeconds, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.watchdogTick()
             }
-        }
+        })
     }
 
     private func watchdogTick() {
@@ -519,11 +519,6 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    deinit {
-        watchdog?.invalidate()
-        notificationObservers.forEach(NotificationCenter.default.removeObserver(_:))
-    }
-
     // MARK: - VLC fallback engine
 
     private func stopVLC() {
@@ -537,8 +532,7 @@ final class PlayerViewModel: ObservableObject {
     #if canImport(VLCKitSPM)
     private func startVLCPlayback(_ stream: LiveStream, url: URL, as initialState: State) {
         settings = settingsStore.load()
-        watchdog?.invalidate()
-        watchdog = nil
+        teardown.setTimer(nil)
         stopVLC()
         replacePlayer() // park the AVPlayer
 

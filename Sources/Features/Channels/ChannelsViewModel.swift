@@ -45,7 +45,9 @@ final class ChannelsViewModel: ObservableObject {
     /// True for the demo catalog: the screenshot env flag OR the user-facing
     /// "Sample channels" account.
     private let isDemo: Bool
-    private var favoritesSyncObserver: NSObjectProtocol?
+    /// Owns the iCloud-favorites observer token; removes it on release so no
+    /// nonisolated deinit has to touch non-Sendable state.
+    private let teardown = TeardownBag()
 
     /// `lastChannel` defaults to a store scoped to this account, so the browser
     /// can never restore another provider's category or stream.
@@ -60,19 +62,13 @@ final class ChannelsViewModel: ObservableObject {
         Task { await loadCategories() }
     }
 
-    deinit {
-        if let favoritesSyncObserver {
-            NotificationCenter.default.removeObserver(favoritesSyncObserver)
-        }
-    }
-
     /// Picks up favorites toggled on another device while this screen is open.
     /// iCloud KVS is last-writer-wins per key, so the remote value replaces
     /// ours wholesale — that's what makes removals propagate.
     private func observeFavoritesSync() {
         guard !isDemo else { return }
         let key = favoritesStore.storageKey
-        favoritesSyncObserver = NotificationCenter.default.addObserver(
+        teardown.store(NotificationCenter.default.addObserver(
             forName: SyncedStorage.didChangeExternallyNotification,
             object: nil,
             queue: .main
@@ -80,7 +76,7 @@ final class ChannelsViewModel: ObservableObject {
             let changed = notification.userInfo?[SyncedStorage.changedKeysUserInfoKey] as? [String] ?? []
             guard changed.contains(key) else { return }
             Task { @MainActor [weak self] in self?.adoptRemoteFavorites() }
-        }
+        })
     }
 
     private func adoptRemoteFavorites() {
