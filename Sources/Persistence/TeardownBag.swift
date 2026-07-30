@@ -13,26 +13,27 @@ import Foundation
 /// main actor, so the `deinit` backstop runs there too.
 public final class TeardownBag: @unchecked Sendable {
     private let lock = NSLock()
-    private var tokens: [NSObjectProtocol] = []
+    private var observations: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     private var timer: Timer?
 
     public init() {}
 
-    /// Keeps a NotificationCenter block-observer token alive until removal or
-    /// the bag's release.
-    public func store(_ token: NSObjectProtocol) {
+    /// Keeps a block-observer token alive until removal or the bag's release.
+    /// Tokens must be removed from the center that created them, so the pair
+    /// is stored together; `center` defaults to `.default`.
+    public func store(_ token: NSObjectProtocol, from center: NotificationCenter = .default) {
         lock.lock()
-        tokens.append(token)
+        observations.append((center, token))
         lock.unlock()
     }
 
     /// Removes every stored observer now. The bag stays usable afterwards.
     public func removeObservers() {
         lock.lock()
-        let removed = tokens
-        tokens = []
+        let removed = observations
+        observations = []
         lock.unlock()
-        removed.forEach(NotificationCenter.default.removeObserver(_:))
+        removed.forEach { $0.center.removeObserver($0.token) }
     }
 
     /// Replaces the owned timer, invalidating the previous one. Pass `nil` to
@@ -46,7 +47,7 @@ public final class TeardownBag: @unchecked Sendable {
     }
 
     deinit {
-        tokens.forEach(NotificationCenter.default.removeObserver(_:))
+        observations.forEach { $0.center.removeObserver($0.token) }
         timer?.invalidate()
     }
 }
