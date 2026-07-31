@@ -58,8 +58,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Mirrors favorites/last channel/playback settings via iCloud KVS.
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "1.1.2"
-        CFBundleVersion: "19"
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "20"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.video
@@ -107,8 +107,8 @@ targets:
         CFBundleDisplayName: IronTV
         # Mirrors favorites/last channel/playback settings via iCloud KVS.
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "1.1.2"
-        CFBundleVersion: "19"
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "20"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         # Single playback scene: every window is a provider connection slot
@@ -157,8 +157,8 @@ targets:
         CFBundleName: IronTV
         CFBundleDisplayName: IronTV
         IronTVCloudKVSEnabled: true
-        CFBundleShortVersionString: "1.1.2"
-        CFBundleVersion: "19"
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "20"
         NSHumanReadableCopyright: "© 2026 Joaquin Bejar. All rights reserved."
         ITSAppUsesNonExemptEncryption: false
         # Single playback scene, same policy as iOS (issue #10).
