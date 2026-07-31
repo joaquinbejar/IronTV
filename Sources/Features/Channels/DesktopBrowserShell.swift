@@ -172,6 +172,7 @@ struct DesktopBrowserShell: View {
                     Image(systemName: "star")
                         .font(.system(size: 28))
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text("No favorites yet")
                         .font(.headline)
                     // The hint must name the interaction each platform

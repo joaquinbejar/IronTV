@@ -172,8 +172,12 @@ struct AccountSettingsTab: View {
             ? String(localized: "Hide playlist URL")
             : String(localized: "Show playlist URL")
         #if os(tvOS)
-        // The focus engine needs a real, labelled control here.
-        Button(viewModel.isRevealingURL ? "Hide" : "Show") { viewModel.toggleURLReveal() }
+        // The focus engine needs a real, labelled control here. Text-based
+        // title so the catalog translation resolves — a String ternary would
+        // render verbatim English.
+        Button { viewModel.toggleURLReveal() } label: {
+            viewModel.isRevealingURL ? Text("Hide") : Text("Show")
+        }
             .accessibilityLabel(label)
             .accessibilityIdentifier("settings.revealToggle")
         #else

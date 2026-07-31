@@ -48,7 +48,11 @@ struct PlayerView: View {
                             Text(viewModel.engine == .vlc ? "VLC" : "Apple")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                                .accessibilityLabel(viewModel.engine == .vlc ? "Playing with the VLC engine" : "Playing with the Apple engine")
+                                // Text-based so Spanish VoiceOver gets the
+                                // catalog translation, not the raw String.
+                                .accessibilityLabel(viewModel.engine == .vlc
+                                    ? Text("Playing with the VLC engine")
+                                    : Text("Playing with the Apple engine"))
                                 .accessibilityIdentifier("player.engineChip")
                         }
                     }
@@ -147,13 +151,17 @@ struct PlayerView: View {
         }
         .overlay(alignment: .bottomTrailing) {
             if showEngineBadge, viewModel.currentStream != nil {
-                Text(viewModel.engine == .vlc ? "VLC engine" : "Apple engine")
+                // Ternary at the Text level, not inside one Text(String) —
+                // these keys have Spanish translations that must resolve.
+                (viewModel.engine == .vlc ? Text("VLC engine") : Text("Apple engine"))
                     .font(.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(12)
-                    .accessibilityLabel(viewModel.engine == .vlc ? "Playing with the VLC engine" : "Playing with the Apple engine")
+                    .accessibilityLabel(viewModel.engine == .vlc
+                        ? Text("Playing with the VLC engine")
+                        : Text("Playing with the Apple engine"))
             }
         }
         .task(id: EngineBadgeKey(engine: viewModel.engine, generation: viewModel.playbackGeneration)) {

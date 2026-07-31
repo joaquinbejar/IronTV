@@ -948,6 +948,17 @@
         }
       }
     },
+    "Tap the star on any channel to add it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca la estrella de cualquier canal para añadirlo."
+          }
+        }
+      }
+    },
     "The URL has no password parameter.": {
       "extractionState": "manual",
       "localizations": {

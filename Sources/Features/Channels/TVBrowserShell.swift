@@ -93,6 +93,7 @@ struct TVChannelListScreen: View {
                         Image(systemName: "star")
                             .font(.system(size: 40))
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                         Text("No favorites yet")
                             .font(.headline)
                         // The star on a row is an indicator, not a control —

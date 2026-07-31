@@ -21,6 +21,9 @@ struct ChannelIconView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // The icon never carries information the channel name doesn't; the
+        // placeholder glyph must not be announced either.
+        .accessibilityHidden(true)
         // task(id:) both cancels the await when the row scrolls away and
         // restarts it when a recycled row is handed a different channel; a
         // cache hit resolves before the next frame, so the reset can't
