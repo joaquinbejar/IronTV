@@ -53,9 +53,12 @@ public extension AccountInfoDTO {
         )
     }
 
-    /// Panels put anything in `https_port`: 0 when TLS is off, the plain http
-    /// port, negative or overflowing garbage. Only a valid TCP port survives;
-    /// everything else means "no advertised TLS endpoint".
+    /// Panels put anything in `https_port`: 0 when TLS is off, negative or
+    /// overflowing garbage, sometimes just the http port repeated. This layer
+    /// only rejects what cannot be a TCP port (outside 1...65535) — whether
+    /// the advertised port is genuinely distinct, reachable, and speaking
+    /// authenticated TLS is the caller's job (`SettingsViewModel` skips the
+    /// already-probed twin and verifies before trusting).
     private static func sanitizedHTTPSPort(_ raw: Int?) -> Int? {
         guard let raw, (1...65535).contains(raw) else { return nil }
         return raw

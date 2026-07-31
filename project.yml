@@ -24,11 +24,13 @@ packages:
     exactVersion: "3.6.0"
 settings:
   base:
-    SWIFT_VERSION: "5.9"
-    # Strict concurrency stays on permanently: the isolation model
+    SWIFT_VERSION: "6.0"
+    # Swift 6 language mode makes complete concurrency checking part of the
+    # language — isolation violations are compile errors now, not warnings.
+    # The explicit setting stays as documentation of intent (and as the
+    # safety net if SWIFT_VERSION is ever rolled back): the isolation model
     # (@MainActor view models, Sendable stores, TeardownBag-owned observer
-    # lifecycles) is load-bearing, and Swift 6 language mode turns these
-    # warnings into errors. Keep the build at zero warnings.
+    # lifecycles) is load-bearing. Keep the build at zero warnings.
     SWIFT_STRICT_CONCURRENCY: complete
     # App Store distribution on all platforms. Automatic signing lets Xcode
     # pick Apple Development for Debug and Apple Distribution for archives.
