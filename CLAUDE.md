@@ -39,7 +39,7 @@ After adding/removing/renaming source files, run `xcodegen generate` before buil
 ## Conventions
 
 - **Versioning & DMG**: every new build delivered for testing bumps the patch version (`CFBundleShortVersionString`) and increments `CFBundleVersion` in `project.yml` on all three targets, then regenerates the DMG with `scripts/make-dmg.sh` (output in `dist/`). Stacked PRs never bump — the bump happens once at delivery.
-- **Docs follow project.yml**: a change to deployment targets, bundle id, or Swift version in `project.yml` updates `README.md` and this file in the same PR — `scripts/check-docs-drift.sh` (a required CI job) fails otherwise.
+- **Docs follow project.yml**: a change to deployment targets, bundle id, or Swift version in `project.yml` updates `README.md` and this file in the same PR — `scripts/check-docs-drift.sh` (the `docs-drift` CI job) fails otherwise. Like every gate here, a red run must not be merged; marking the job as a required status check in branch protection is the owner's repository setting.
 - All code, comments, and documentation in English.
 - Domain modeling first: domain types (`Account`, `Category`, `LiveStream`) are separate from API DTOs. DTOs live in `Sources/API/DTO/`, domain types in `Sources/Domain/`.
 - Xtream panels are PHP-backed and inconsistent: numeric fields may arrive as `Int` or `String` depending on the panel. All DTOs must decode both (use a `FlexibleInt`/`FlexibleString` property wrapper or custom `init(from:)`) and tolerate `null`/absent.
