@@ -79,6 +79,10 @@ struct PlayerView: View {
                             .disabled(viewModel.currentStream == nil)
                         }
                     }
+                    #endif
+                    #if os(macOS) || os(iOS)
+                    // iPhone landscape is already edge-to-edge, but iPad —
+                    // and iPhone portrait — need an explicit way in.
                     ToolbarItem {
                         Button(action: toggleFullScreen) {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -209,6 +213,10 @@ struct PlayerView: View {
         onWillToggleFullScreen?()
         window.collectionBehavior.insert(.fullScreenPrimary)
         window.toggleFullScreen(nil)
+        #elseif os(iOS)
+        // No window mode to toggle here — the browser shell swaps its
+        // hierarchy to the bare player and provides the exit control.
+        onWillToggleFullScreen?()
         #endif
     }
 

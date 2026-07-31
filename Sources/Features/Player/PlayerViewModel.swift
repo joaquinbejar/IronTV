@@ -782,6 +782,19 @@ final class PlayerViewModel: ObservableObject {
         startVLCPlayback(currentStream, url: currentVLCURL ?? currentURL, as: .buffering)
     }
 
+    /// The video surface was torn down and rebuilt — a hierarchy swap like
+    /// full screen or the floating window, not a resize. VLC renders into a
+    /// concrete view and reassigning the drawable mid-playback leaves the
+    /// output black, so a new drawable always rebuilds the output; the
+    /// material-size guard doesn't apply (the new surface can even have the
+    /// same bounds). No-op for the Apple engine, whose AVPlayer re-attaches
+    /// to the recreated view on its own.
+    func videoSurfaceRecreated() {
+        guard engine == .vlc, let currentStream, let currentURL else { return }
+        lastGeometryRestartSize = currentSurfaceSize
+        startVLCPlayback(currentStream, url: currentVLCURL ?? currentURL, as: .buffering)
+    }
+
     /// VLC's playback clock advanced — frames are flowing.
     func vlcTimeAdvanced(fromPlayerID playerID: ObjectIdentifier) {
         guard let vlcPlayer, ObjectIdentifier(vlcPlayer) == playerID else { return }

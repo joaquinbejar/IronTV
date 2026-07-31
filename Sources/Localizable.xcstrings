@@ -295,6 +295,17 @@
         }
       }
     },
+    "Exit full screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salir de pantalla completa"
+          }
+        }
+      }
+    },
     "Fast reconnect attempts": {
       "extractionState": "manual",
       "localizations": {

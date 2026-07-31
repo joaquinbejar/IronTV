@@ -106,8 +106,9 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
 
         #if canImport(VLCKitSPM)
         // VLC renders into a concrete NSView — rebuild its output for the
-        // floating window's surface.
-        viewModel.videoSurfaceGeometryChanged()
+        // floating window's surface. Unconditional: even a same-size swap
+        // needs the new drawable wired up.
+        viewModel.videoSurfaceRecreated()
         #endif
     }
 
@@ -140,7 +141,7 @@ final class FloatingPlayerManager: NSObject, ObservableObject {
 
         #if canImport(VLCKitSPM)
         if rebuildingSurface {
-            activeViewModel?.videoSurfaceGeometryChanged()
+            activeViewModel?.videoSurfaceRecreated()
         }
         #endif
         activeViewModel = nil

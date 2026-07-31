@@ -30,8 +30,8 @@ Conventions in place:
   screen, floating-exit. Stable `.accessibilityIdentifier`s
   (`browser.settingsButton`, `settings.revealToggle`, `player.resyncButton`,
   `player.floatingButton`, `player.fullScreenButton`,
-  `player.exitFloatingButton`, `player.retryButton`,
-  `player.engineChip`, `channel.favoriteToggle`,
+  `player.exitFullScreenButton` (iOS), `player.exitFloatingButton`,
+  `player.retryButton`, `player.engineChip`, `channel.favoriteToggle`,
   `loadFailure.retryButton`) for future UI automation.
 - Channel rows combine into one VoiceOver element whose value announces the
   favorite state; the favorite star is never color-only (filled vs outline),

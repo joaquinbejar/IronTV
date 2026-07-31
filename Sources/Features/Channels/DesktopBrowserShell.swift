@@ -26,6 +26,13 @@ struct DesktopBrowserShell: View {
     var body: some View {
         content
             .task { applyDemoScreenIfNeeded() }
+            .onChange(of: isFullScreen) { _, _ in
+                // The swap tears down the video surface; VLC must rebuild its
+                // output into the new drawable or it renders black (same
+                // reason the floating window restarts it). Apple engine:
+                // no-op.
+                player.videoSurfaceRecreated()
+            }
     }
 
     @ViewBuilder
@@ -33,6 +40,25 @@ struct DesktopBrowserShell: View {
         if isFullScreen {
             PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen, hidesChrome: true)
                 .windowToolbarHidden(true)
+                #if os(iOS)
+                // macOS exits through the window (green button, Ctrl+Cmd+F);
+                // iOS has no window mode, so the bare player carries its own
+                // way back.
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        isFullScreen = false
+                    } label: {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(10)
+                            .background(.black.opacity(0.45), in: Circle())
+                    }
+                    .padding(16)
+                    .accessibilityLabel("Exit full screen")
+                    .accessibilityIdentifier("player.exitFullScreenButton")
+                }
+                #endif
         } else {
             #if os(iOS)
             NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $preferredCompactColumn) {
