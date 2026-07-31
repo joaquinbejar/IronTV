@@ -167,12 +167,13 @@ final class ChannelsViewModelTests: XCTestCase {
     }
 
     @MainActor
-    private func makeViewModel(_ browser: ScriptedBrowser) -> ChannelsViewModel {
+    private func makeViewModel(_ browser: ScriptedBrowser, searchDebounce: Duration = .zero) -> ChannelsViewModel {
         ChannelsViewModel(
             account: account,
             lastChannel: LastChannelStore(identity: account.identity, storage: defaults),
             client: browser,
-            preferenceStorage: defaults
+            preferenceStorage: defaults,
+            searchDebounce: searchDebounce
         )
     }
 
@@ -180,6 +181,18 @@ final class ChannelsViewModelTests: XCTestCase {
     @MainActor
     private func settle() async {
         for _ in 0..<20 { await Task.yield() }
+    }
+
+    /// The search pipeline hops off the main actor (debounce + detached
+    /// filter), so assertions poll until the condition holds — bounded, and
+    /// in practice one or two milliseconds.
+    @MainActor
+    private func waitUntil(_ label: String, _ condition: () -> Bool) async {
+        for _ in 0..<2000 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        XCTFail("timed out waiting for \(label)")
     }
 
     // MARK: - Cancellation
@@ -459,5 +472,104 @@ final class ChannelsViewModelTests: XCTestCase {
         }
         let cancelled = await browser.cancelledFetches
         XCTAssertGreaterThan(cancelled, 0, "releasing the owner must cancel the provider fetch itself")
+    }
+
+    // MARK: - Search
+
+    private static func stream(_ id: Int, named name: String) -> LiveStream {
+        LiveStream(id: StreamID(id), name: name, iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
+    }
+
+    @MainActor
+    func testVisibleStreamsFollowTheQueryCaseAndDiacriticInsensitively() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [1: [
+                Self.stream(11, named: "Café Sports HD"),
+                Self.stream(12, named: "News 24"),
+            ]]
+        }
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        XCTAssertEqual(viewModel.visibleStreams.map(\.id.rawValue), [11, 12], "an empty query shows the full list synchronously")
+
+        viewModel.searchText = "cafe"
+        await waitUntil("the diacritic-insensitive match") {
+            viewModel.visibleStreams.map(\.id.rawValue) == [11]
+        }
+    }
+
+    @MainActor
+    func testLatestQueryWinsWhileTyping() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [1: [
+                Self.stream(11, named: "Alpha"),
+                Self.stream(12, named: "News 24"),
+            ]]
+        }
+        // A real debounce window: the first keystroke must be superseded
+        // inside it, so only the final query's result can ever land.
+        let viewModel = makeViewModel(browser, searchDebounce: .milliseconds(30))
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+
+        viewModel.searchText = "alpha"
+        viewModel.searchText = "news"
+        await waitUntil("the final query's result") {
+            viewModel.visibleStreams.map(\.id.rawValue) == [12]
+        }
+        XCTAssertEqual(viewModel.searchText, "news")
+    }
+
+    @MainActor
+    func testClearingTheQueryRestoresTheFullListSynchronously() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [1: [
+                Self.stream(11, named: "Alpha"),
+                Self.stream(12, named: "News 24"),
+            ]]
+        }
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+        viewModel.searchText = "news"
+        await waitUntil("the filtered list") { viewModel.visibleStreams.count == 1 }
+
+        viewModel.searchText = ""
+
+        XCTAssertEqual(viewModel.visibleStreams.map(\.id.rawValue), [11, 12], "clearing must not wait for a debounce")
+    }
+
+    @MainActor
+    func testReloadUnderAnActiveQueryReappliesTheFilter() async {
+        let browser = ScriptedBrowser()
+        await browser.configure {
+            $0.streamsByCategory = [
+                1: [Self.stream(11, named: "News One"), Self.stream(12, named: "Movies")],
+                2: [Self.stream(21, named: "News Two"), Self.stream(22, named: "Kids")],
+            ]
+        }
+        let viewModel = makeViewModel(browser)
+        await settle()
+        viewModel.selectedCategory = .category(CategoryID(1))
+        await viewModel.loadStreams()
+        viewModel.searchText = "news"
+        await waitUntil("the first category's match") {
+            viewModel.visibleStreams.map(\.id.rawValue) == [11]
+        }
+
+        viewModel.selectedCategory = .category(CategoryID(2))
+        await viewModel.loadStreams()
+
+        await waitUntil("the new category filtered by the standing query") {
+            viewModel.visibleStreams.map(\.id.rawValue) == [21]
+        }
     }
 }

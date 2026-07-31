@@ -97,7 +97,7 @@ struct TVChannelListScreen: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    List(channels.filteredStreams) { stream in
+                    List(channels.visibleStreams) { stream in
                         NavigationLink(value: stream) {
                             ChannelRow(
                                 stream: stream,

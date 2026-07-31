@@ -11,9 +11,21 @@ final class ChannelsViewModel: ObservableObject {
 
     @Published private(set) var categories: [Category] = []
     @Published private(set) var categoriesPhase: Phase = .loading
-    @Published private(set) var streams: [LiveStream] = []
+    @Published private(set) var streams: [LiveStream] = [] {
+        didSet { scheduleVisibleStreamsRefresh(debounced: false) }
+    }
     @Published private(set) var streamsPhase: Phase = .loaded
-    @Published var searchText = ""
+    @Published var searchText = "" {
+        didSet {
+            guard searchText != oldValue else { return }
+            scheduleVisibleStreamsRefresh(debounced: true)
+        }
+    }
+    /// What the lists render: `streams` with the search filter applied.
+    /// Maintained asynchronously — typing debounces, and the filter itself
+    /// runs detached over a snapshot — so a keystroke never walks a 50k-row
+    /// catalog on the main actor inside a view update.
+    @Published private(set) var visibleStreams: [LiveStream] = []
 
     @Published var selectedCategory: CategorySelection? {
         didSet {
@@ -45,6 +57,15 @@ final class ChannelsViewModel: ObservableObject {
     /// Main-actor-confined, like every other piece of this view model's state:
     /// only retained tasks running on this actor read or write it, and every
     /// write sits behind a current-selection guard.
+    ///
+    /// Eviction is by lifetime, not by count: the cache lives and dies with
+    /// this view model, which `RootView` recreates per account identity — an
+    /// account change can never leak another provider's catalog. Memory-wise
+    /// the per-category fast path is the real mitigation for huge catalogs
+    /// (the full list is fetched only for All/Favorites and deduped); a
+    /// streamed JSON decode was considered and rejected — Foundation has no
+    /// incremental `JSONDecoder`, and the payload must be complete before
+    /// rows render anyway.
     private var streamCache: [CategorySelection: [LiveStream]] = [:]
     /// Stream to re-select once its category's streams arrive (launch restore).
     private var pendingStreamRestore: StreamID?
@@ -63,6 +84,15 @@ final class ChannelsViewModel: ObservableObject {
     /// Single in-flight fetch of the full channel list — All and Favorites
     /// dedupe on it instead of issuing a second identical request.
     private var allStreamsTask: Task<[LiveStream], Error>?
+    /// The pending search refresh. Superseded refreshes are cancelled and
+    /// additionally generation-checked: cancellation is advisory, the
+    /// generation is what guarantees an older filter result can never land
+    /// on top of a newer one.
+    private var searchTask: Task<Void, Never>?
+    private var searchGeneration: UInt64 = 0
+    /// How long typing may pause before the filter runs. Injectable so tests
+    /// don't wait real wall-clock time.
+    private let searchDebounce: Duration
 
     /// True for the demo catalog: the screenshot env flag OR the user-facing
     /// "Sample channels" account.
@@ -79,8 +109,10 @@ final class ChannelsViewModel: ObservableObject {
         account: Account,
         lastChannel: LastChannelStore? = nil,
         client: ChannelBrowsing? = nil,
-        preferenceStorage: KeyValueStorage = SyncedStorage.shared
+        preferenceStorage: KeyValueStorage = SyncedStorage.shared,
+        searchDebounce: Duration = .milliseconds(250)
     ) {
+        self.searchDebounce = searchDebounce
         let settings = PlaybackSettingsStore().load()
         self.client = client ?? XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
         self.panelHost = account.host
@@ -108,6 +140,7 @@ final class ChannelsViewModel: ObservableObject {
         streamsTask?.cancel()
         allStreamsTask?.cancel()
         capabilitiesTask?.cancel()
+        searchTask?.cancel()
     }
 
     /// Detached like every other fetch: the wrapper must not pin the view
@@ -166,10 +199,41 @@ final class ChannelsViewModel: ObservableObject {
         streams = all.filter { favorites.contains($0.id) }
     }
 
-    var filteredStreams: [LiveStream] {
+    /// Recomputes ``visibleStreams``. An empty query short-circuits to a plain
+    /// assignment — no debounce, no hop — so list loads render immediately.
+    /// A non-empty query snapshots `streams`, optionally debounces (typing),
+    /// filters detached off the main actor, and applies the result only if no
+    /// newer refresh has been scheduled since.
+    private func scheduleVisibleStreamsRefresh(debounced: Bool) {
+        searchTask?.cancel()
+        searchGeneration &+= 1
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return streams }
-        return streams.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        guard !query.isEmpty else {
+            searchTask = nil
+            visibleStreams = streams
+            return
+        }
+        let generation = searchGeneration
+        let snapshot = streams
+        let debounce = searchDebounce
+        searchTask = Task { [weak self] in
+            if debounced {
+                try? await Task.sleep(for: debounce)
+                guard !Task.isCancelled else { return }
+            }
+            let filtered = await Task.detached { Self.filter(snapshot, query: query) }.value
+            guard let self, !Task.isCancelled, self.searchGeneration == generation else { return }
+            self.visibleStreams = filtered
+        }
+    }
+
+    /// Case- and diacritic-insensitive match, so "cafe" finds "Café HD".
+    /// Pure and nonisolated: this is the hot path a 50k-row catalog walks,
+    /// and it runs detached from the main actor.
+    nonisolated static func filter(_ streams: [LiveStream], query: String) -> [LiveStream] {
+        streams.filter {
+            $0.name.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
     }
 
     func selectedStream() -> LiveStream? {
