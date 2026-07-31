@@ -228,7 +228,7 @@ final class SettingsViewModel: ObservableObject {
                 }
             }
 
-            let finalStatus: AccountStatus
+            var finalStatus: AccountStatus
             if let status {
                 finalStatus = status
             } else {
@@ -239,6 +239,23 @@ final class SettingsViewModel: ObservableObject {
             guard finalStatus.authenticated else {
                 phase = .failure(Self.rejectionMessage(for: finalStatus))
                 return
+            }
+            if insecureTransportConfirmed, !resolved.usesSecureTransport,
+               let secured = Self.advertisedHTTPSUpgrade(of: resolved, from: finalStatus) {
+                // The authenticated HTTP response says where the panel's TLS
+                // endpoint really lives — usually a different port, which is
+                // why the same-port probe missed it. Verified before switching;
+                // any failure keeps the http account the user just confirmed,
+                // so the upgrade attempt can never block the save.
+                let probed = try? await makeClient(secured, min(timeout, Self.httpsProbeTimeout)).accountStatus()
+                guard isStillCurrent(submitted) else { return }
+                if let probed, probed.authenticated {
+                    resolved = secured
+                    // The TLS endpoint's own answer describes the account
+                    // being saved — expiry shown must match it, not the http
+                    // response it replaced.
+                    finalStatus = probed
+                }
             }
             if resolved.host != account.host, let previous = appModel.account,
                previous.username == resolved.username, previous.host == account.host {
@@ -262,6 +279,21 @@ final class SettingsViewModel: ObservableObject {
     private static func rejectionMessage(for status: AccountStatus) -> String {
         let detail = status.status.map { " (status: \($0))" } ?? ""
         return "The panel rejected these credentials\(detail)."
+    }
+
+    /// The account rebased onto the panel's advertised TLS port. nil when the
+    /// panel advertised nothing valid, or advertised the endpoint the same-port
+    /// twin probe already tried before the user confirmed plain HTTP.
+    private static func advertisedHTTPSUpgrade(of account: Account, from status: AccountStatus) -> Account? {
+        guard let advertised = status.advertisedHTTPSPort else { return nil }
+        guard advertised != (account.host.port ?? 443) else { return nil }
+        guard var components = URLComponents(url: account.host, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        components.scheme = "https"
+        components.port = advertised
+        guard let host = components.url else { return nil }
+        return Account(host: host, username: account.username, password: account.password)
     }
 
     /// The same account with the host scheme swapped to https (port kept).

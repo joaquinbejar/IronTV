@@ -20,8 +20,7 @@ public struct XtreamClient: Sendable {
     /// `player_api.php` with no action.
     public func accountStatus() async throws -> AccountStatus {
         let dto: AccountInfoDTO = try await fetch(playerAPIURL(action: nil))
-        return dto.userInfo?.toDomain()
-            ?? AccountStatus(authenticated: false, status: nil, expiryDate: nil, maxConnections: nil)
+        return dto.toAccountStatus()
     }
 
     public func liveCategories() async throws -> [Category] {

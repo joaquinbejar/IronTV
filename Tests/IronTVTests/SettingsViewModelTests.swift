@@ -65,8 +65,14 @@ final class SettingsViewModelTests: XCTestCase {
         }
     }
 
-    private func authenticated(expiry: Date? = nil) -> AccountStatus {
-        AccountStatus(authenticated: true, status: "Active", expiryDate: expiry, maxConnections: 2)
+    private func authenticated(expiry: Date? = nil, advertisedHTTPSPort: Int? = nil) -> AccountStatus {
+        AccountStatus(
+            authenticated: true,
+            status: "Active",
+            expiryDate: expiry,
+            maxConnections: 2,
+            advertisedHTTPSPort: advertisedHTTPSPort
+        )
     }
 
     private func rejected() -> AccountStatus {
@@ -122,6 +128,34 @@ final class SettingsViewModelTests: XCTestCase {
             migratePreferences: { migrations.migrations.append((from: $0, to: $1)) }
         )
         return (viewModel, spy)
+    }
+
+    /// Variant whose panel double answers per origin (`"scheme:port"`), so the
+    /// same-port twin probe, the http validation, and the advertised-port
+    /// probe can be scripted independently.
+    private func makeViewModel(
+        resultsByOrigin: [String: Result<AccountStatus, Error>],
+        gatesByOrigin: [String: Gate] = [:],
+        settings: PlaybackSettings = .default,
+        spy: FactorySpy = FactorySpy(),
+        migrations: MigrationSpy = MigrationSpy()
+    ) -> (SettingsViewModel, FactorySpy) {
+        let viewModel = SettingsViewModel(
+            makeClient: { account, timeout in
+                spy.accounts.append(account)
+                spy.timeouts.append(timeout)
+                let origin = Self.origin(of: account)
+                let result = resultsByOrigin[origin] ?? .failure(URLError(.unsupportedURL))
+                return FakeClient(result: result, gate: gatesByOrigin[origin])
+            },
+            currentSettings: { settings },
+            migratePreferences: { migrations.migrations.append((from: $0, to: $1)) }
+        )
+        return (viewModel, spy)
+    }
+
+    private static func origin(of account: Account) -> String {
+        "\(account.host.scheme ?? ""):\(account.host.port.map(String.init) ?? "")"
     }
 
     // MARK: - Success
@@ -573,6 +607,140 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(migrations.migrations.count, 1)
         XCTAssertEqual(migrations.migrations.first?.from, previous)
         XCTAssertEqual(migrations.migrations.first?.to.host.scheme, "https")
+    }
+
+    // MARK: - Advertised HTTPS port upgrade
+
+    func testConfirmedHTTPUpgradesToTheAdvertisedHTTPSPort() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        // Distinct expiries: what the UI reports must come from the TLS
+        // endpoint actually saved, not the http response it replaced.
+        let probedExpiry = Date(timeIntervalSince1970: 1_767_225_600)
+        let (viewModel, spy) = makeViewModel(resultsByOrigin: [
+            "https:8080": .failure(URLError(.secureConnectionFailed)),
+            "http:8080": .success(authenticated(expiry: Date(timeIntervalSince1970: 1_700_000_000), advertisedHTTPSPort: 8443)),
+            "https:8443": .success(authenticated(expiry: probedExpiry)),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: probedExpiry), "success must report the saved endpoint's own status")
+        XCTAssertEqual(store.saved?.host.scheme, "https")
+        XCTAssertEqual(store.saved?.host.port, 8443, "the account must land on the advertised TLS port")
+        XCTAssertEqual(spy.accounts.map(Self.origin(of:)), ["https:8080", "http:8080", "https:8443"])
+        XCTAssertEqual(spy.timeouts, [8, 30, 8], "the advertised-port probe is capped like the twin probe")
+    }
+
+    func testUnreachableAdvertisedPortKeepsTheConfirmedHTTPAccount() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, _) = makeViewModel(resultsByOrigin: [
+            "https:8080": .failure(URLError(.secureConnectionFailed)),
+            "http:8080": .success(authenticated(advertisedHTTPSPort: 8443)),
+            "https:8443": .failure(URLError(.timedOut)),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil), "a dead advertised port must never block the save")
+        XCTAssertEqual(store.saved?.host.scheme, "http")
+        XCTAssertEqual(store.saved?.host.port, 8080)
+    }
+
+    func testRejectedAdvertisedPortKeepsTheConfirmedHTTPAccount() async {
+        // The TLS endpoint answered but refused the credentials — a different
+        // vhost or a stale panel config. The http account the panel just
+        // authenticated is what the user gets.
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, _) = makeViewModel(resultsByOrigin: [
+            "https:8080": .failure(URLError(.secureConnectionFailed)),
+            "http:8080": .success(authenticated(advertisedHTTPSPort: 8443)),
+            "https:8443": .success(rejected()),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.scheme, "http")
+    }
+
+    func testAdvertisedPortEqualToTheProbedTwinIsNotRetried() async {
+        // The same-port twin already failed before the confirmation — an
+        // advertised port pointing at that same endpoint adds nothing.
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let (viewModel, spy) = makeViewModel(resultsByOrigin: [
+            "https:8080": .failure(URLError(.secureConnectionFailed)),
+            "http:8080": .success(authenticated(advertisedHTTPSPort: 8080)),
+        ])
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.scheme, "http")
+        XCTAssertEqual(spy.accounts.map(Self.origin(of:)), ["https:8080", "http:8080"])
+    }
+
+    func testAdvertisedPortUpgradeMigratesPreferencesFromThePreviousAccount() async throws {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let previous = Account(host: URL(string: "http://host.example.com:8080")!, username: "user1", password: "oldpass")
+        try appModel.saveAccount(previous)
+        let migrations = MigrationSpy()
+        let (viewModel, _) = makeViewModel(
+            resultsByOrigin: [
+                "https:8080": .failure(URLError(.secureConnectionFailed)),
+                "http:8080": .success(authenticated(advertisedHTTPSPort: 8443)),
+                "https:8443": .success(authenticated()),
+            ],
+            migrations: migrations
+        )
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        await viewModel.confirmInsecureTransport(into: appModel)
+
+        XCTAssertEqual(store.saved?.host.port, 8443)
+        XCTAssertEqual(migrations.migrations.count, 1)
+        XCTAssertEqual(migrations.migrations.first?.from, previous)
+        XCTAssertEqual(migrations.migrations.first?.to.host.port, 8443)
+    }
+
+    func testEditingDuringTheAdvertisedPortProbeDiscardsTheResult() async {
+        let store = FakeAccountStore()
+        let appModel = AppModel(store: store)
+        let gate = Gate()
+        let (viewModel, _) = makeViewModel(
+            resultsByOrigin: [
+                "https:8080": .failure(URLError(.secureConnectionFailed)),
+                "http:8080": .success(authenticated(advertisedHTTPSPort: 8443)),
+                "https:8443": .success(authenticated()),
+            ],
+            gatesByOrigin: ["https:8443": gate]
+        )
+
+        viewModel.urlText = validURL
+        await viewModel.validateAndSave(into: appModel)
+        let confirmation = Task { await viewModel.confirmInsecureTransport(into: appModel) }
+        await Task.yield()
+
+        viewModel.urlText = otherURL
+        await gate.open()
+        await confirmation.value
+
+        XCTAssertNil(store.saved, "a stale upgrade completion must not save any account")
+        XCTAssertEqual(viewModel.phase, .idle)
     }
 
     func testHTTPSURLValidatesDirectlyWithoutProbe() async {

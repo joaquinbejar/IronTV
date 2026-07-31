@@ -15,6 +15,10 @@ final class RealFixtureDecodingTests: XCTestCase {
         let status = userInfo.toDomain()
         XCTAssertTrue(status.authenticated)
         XCTAssertNotNil(status.expiryDate)
+
+        // This panel reports "0" — TLS off. That must read as no advertised
+        // endpoint, never as an invitation to probe port 0.
+        XCTAssertNil(dto.toAccountStatus().advertisedHTTPSPort)
     }
 
     func testRealLiveCategoriesDecodeAndMap() throws {
