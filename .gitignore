@@ -15,5 +15,9 @@ build/
 xcuserdata/
 dist/
 
+# Claude Code — local working tooling, never committed
+.claude/
+CLAUDE.md
+
 # macOS
 .DS_Store
