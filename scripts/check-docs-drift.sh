@@ -44,15 +44,17 @@ grep -q "tvOS ${tvos_major}+" README.md \
 grep -q "Swift ${swift_major} language mode" README.md \
   || err "README.md does not state 'Swift ${swift_major} language mode' (project.yml says SWIFT_VERSION ${swift})"
 
-# --- CLAUDE.md ---------------------------------------------------------------
-grep -q "macOS ${macos_major}+" CLAUDE.md \
-  || err "CLAUDE.md does not state 'macOS ${macos_major}+' (project.yml says ${macos})"
-grep -Eq "iOS(/iPadOS)? ${ios_major}\+" CLAUDE.md \
-  || err "CLAUDE.md does not state 'iOS ${ios_major}+' (project.yml says ${ios})"
-grep -q "tvOS ${tvos_major}+" CLAUDE.md \
-  || err "CLAUDE.md does not state 'tvOS ${tvos_major}+' (project.yml says ${tvos})"
-grep -q "Swift ${swift_major} language mode" CLAUDE.md \
-  || err "CLAUDE.md does not state 'Swift ${swift_major} language mode' (project.yml says SWIFT_VERSION ${swift})"
+# --- CLAUDE.md (untracked local convention file — checked only if present) ---
+if [ -f CLAUDE.md ]; then
+  grep -q "macOS ${macos_major}+" CLAUDE.md \
+    || err "CLAUDE.md does not state 'macOS ${macos_major}+' (project.yml says ${macos})"
+  grep -Eq "iOS(/iPadOS)? ${ios_major}\+" CLAUDE.md \
+    || err "CLAUDE.md does not state 'iOS ${ios_major}+' (project.yml says ${ios})"
+  grep -q "tvOS ${tvos_major}+" CLAUDE.md \
+    || err "CLAUDE.md does not state 'tvOS ${tvos_major}+' (project.yml says ${tvos})"
+  grep -q "Swift ${swift_major} language mode" CLAUDE.md \
+    || err "CLAUDE.md does not state 'Swift ${swift_major} language mode' (project.yml says SWIFT_VERSION ${swift})"
+fi
 
 # --- SPEC.md (historical, but stated current facts must not mislead) ---------
 grep -q "$bundle" SPEC.md \
@@ -63,7 +65,9 @@ grep -Eq "iOS(/iPadOS)? ${ios_major}\+" SPEC.md \
   || err "SPEC.md's banner does not state 'iOS/iPadOS ${ios_major}+' (project.yml says ${ios})"
 grep -q "tvOS ${tvos_major}+" SPEC.md \
   || err "SPEC.md's banner does not state 'tvOS ${tvos_major}+' (project.yml says ${tvos})"
-if grep -q "com.quantkernel" SPEC.md README.md CLAUDE.md; then
+docs=(SPEC.md README.md)
+[ -f CLAUDE.md ] && docs+=(CLAUDE.md)
+if grep -q "com.quantkernel" "${docs[@]}"; then
   err "a doc still references the pre-rename 'com.quantkernel' bundle id"
 fi
 
@@ -71,4 +75,4 @@ if [ "$fail" -ne 0 ]; then
   echo "docs-drift: fix the doc(s) or project.yml so they agree (see CLAUDE.md convention)." >&2
   exit 1
 fi
-echo "docs-drift: README.md, CLAUDE.md and SPEC.md agree with project.yml (${macos}/${ios}/${tvos}, Swift ${swift}, ${bundle})."
+echo "docs-drift: ${docs[*]} agree with project.yml (${macos}/${ios}/${tvos}, Swift ${swift}, ${bundle})."
