@@ -228,7 +228,7 @@ final class SettingsViewModel: ObservableObject {
                 }
             }
 
-            let finalStatus: AccountStatus
+            var finalStatus: AccountStatus
             if let status {
                 finalStatus = status
             } else {
@@ -251,6 +251,10 @@ final class SettingsViewModel: ObservableObject {
                 guard isStillCurrent(submitted) else { return }
                 if let probed, probed.authenticated {
                     resolved = secured
+                    // The TLS endpoint's own answer describes the account
+                    // being saved — expiry shown must match it, not the http
+                    // response it replaced.
+                    finalStatus = probed
                 }
             }
             if resolved.host != account.host, let previous = appModel.account,

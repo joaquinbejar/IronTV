@@ -614,10 +614,13 @@ final class SettingsViewModelTests: XCTestCase {
     func testConfirmedHTTPUpgradesToTheAdvertisedHTTPSPort() async {
         let store = FakeAccountStore()
         let appModel = AppModel(store: store)
+        // Distinct expiries: what the UI reports must come from the TLS
+        // endpoint actually saved, not the http response it replaced.
+        let probedExpiry = Date(timeIntervalSince1970: 1_767_225_600)
         let (viewModel, spy) = makeViewModel(resultsByOrigin: [
             "https:8080": .failure(URLError(.secureConnectionFailed)),
-            "http:8080": .success(authenticated(advertisedHTTPSPort: 8443)),
-            "https:8443": .success(authenticated()),
+            "http:8080": .success(authenticated(expiry: Date(timeIntervalSince1970: 1_700_000_000), advertisedHTTPSPort: 8443)),
+            "https:8443": .success(authenticated(expiry: probedExpiry)),
         ])
 
         viewModel.urlText = validURL
@@ -625,7 +628,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: probedExpiry), "success must report the saved endpoint's own status")
         XCTAssertEqual(store.saved?.host.scheme, "https")
         XCTAssertEqual(store.saved?.host.port, 8443, "the account must land on the advertised TLS port")
         XCTAssertEqual(spy.accounts.map(Self.origin(of:)), ["https:8080", "http:8080", "https:8443"])

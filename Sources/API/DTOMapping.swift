@@ -48,7 +48,8 @@ public extension AccountInfoDTO {
             expiryDate: base.expiryDate,
             maxConnections: base.maxConnections,
             allowedOutputFormats: base.allowedOutputFormats,
-            advertisedHTTPSPort: Self.sanitizedHTTPSPort(serverInfo?.httpsPort)
+            advertisedHTTPSPort: Self.sanitizedHTTPSPort(serverInfo?.httpsPort),
+            advertisedScheme: Self.sanitizedScheme(serverInfo?.serverProtocol)
         )
     }
 
@@ -58,6 +59,13 @@ public extension AccountInfoDTO {
     private static func sanitizedHTTPSPort(_ raw: Int?) -> Int? {
         guard let raw, (1...65535).contains(raw) else { return nil }
         return raw
+    }
+
+    /// `server_protocol` normalized to the two schemes this app speaks;
+    /// anything else (absent, null, "rtmp", garbage) means "no claim".
+    private static func sanitizedScheme(_ raw: String?) -> String? {
+        guard let scheme = raw?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
+        return scheme
     }
 }
 

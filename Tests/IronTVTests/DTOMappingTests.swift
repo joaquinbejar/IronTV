@@ -128,9 +128,26 @@ final class DTOMappingTests: XCTestCase {
 
         XCTAssertEqual(int.advertisedHTTPSPort, 8443)
         XCTAssertEqual(string.advertisedHTTPSPort, 8443, "String-typed https_port must decode too")
+        XCTAssertEqual(int.advertisedScheme, "http")
+        XCTAssertEqual(string.advertisedScheme, "http")
         XCTAssertTrue(int.authenticated, "user_info fields must survive the combined mapping")
         XCTAssertEqual(int.allowedOutputFormats, [.hls, .ts])
         XCTAssertEqual(int.expiryDate, Date(timeIntervalSince1970: 1_767_225_600))
+    }
+
+    func testAdvertisedSchemeNormalizesAndRejectsUnknowns() throws {
+        let variants: [(label: String, json: String, expected: String?)] = [
+            ("uppercase", #"{"user_info": {"auth": 1}, "server_info": {"server_protocol": "HTTPS"}}"#, "https"),
+            ("plain http", #"{"user_info": {"auth": 1}, "server_info": {"server_protocol": "http"}}"#, "http"),
+            ("rtmp", #"{"user_info": {"auth": 1}, "server_info": {"server_protocol": "rtmp"}}"#, nil),
+            ("garbage", #"{"user_info": {"auth": 1}, "server_info": {"server_protocol": "None"}}"#, nil),
+            ("null", #"{"user_info": {"auth": 1}, "server_info": {"server_protocol": null}}"#, nil),
+            ("absent", #"{"user_info": {"auth": 1}, "server_info": {}}"#, nil),
+        ]
+        for (label, json, expected) in variants {
+            let status = try JSONDecoder().decode(AccountInfoDTO.self, from: Data(json.utf8)).toAccountStatus()
+            XCTAssertEqual(status.advertisedScheme, expected, "server_protocol \(label)")
+        }
     }
 
     func testInvalidAdvertisedHTTPSPortsMapToNil() throws {
