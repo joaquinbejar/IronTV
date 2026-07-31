@@ -170,9 +170,18 @@ struct DesktopBrowserShell: View {
                         .foregroundStyle(.secondary)
                     Text("No favorites yet")
                         .font(.headline)
+                    // The hint must name the interaction each platform
+                    // actually has: context menu under a pointer, the row's
+                    // star button under touch.
+                    #if os(macOS)
                     Text("Right-click any channel and choose “Add to Favorites”.")
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                    #else
+                    Text("Tap the star on any channel to add it.")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    #endif
                 }
                 .padding()
             } else {
