@@ -9,9 +9,10 @@ public enum KeychainError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unexpectedStatus(let status):
-            return "Keychain error (\(status))."
+            let statusText = "\(status)"
+            return String(localized: "Keychain error (\(statusText)).")
         case .corruptedData:
-            return "The stored account could not be read."
+            return String(localized: "The stored account could not be read.")
         }
     }
 }

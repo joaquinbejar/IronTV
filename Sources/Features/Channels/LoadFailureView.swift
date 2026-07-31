@@ -11,10 +11,12 @@ struct LoadFailureView: View {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 28))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(message)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Retry", action: retry)
+                .accessibilityIdentifier("loadFailure.retryButton")
         }
         .padding()
     }

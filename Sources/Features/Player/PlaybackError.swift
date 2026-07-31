@@ -14,13 +14,13 @@ public enum PlaybackError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidStreamURL:
-            return "Could not build a playable URL for this channel."
+            return String(localized: "Could not build a playable URL for this channel.")
         case .itemFailed(let message):
             return message
         case .noPlayableSource:
-            return "This channel advertises no format this device can play."
+            return String(localized: "This channel advertises no format this device can play.")
         case .insecureTransport:
-            return "Playback was stopped: the stream tried to move to an insecure or different server."
+            return String(localized: "Playback was stopped: the stream tried to move to an insecure or different server.")
         }
     }
 }

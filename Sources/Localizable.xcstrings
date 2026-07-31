@@ -1,0 +1,1229 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "API request timeout": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiempo de espera de la API"
+          }
+        }
+      }
+    },
+    "Account": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta"
+          }
+        }
+      }
+    },
+    "Account valid (no expiry reported)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta válida (sin caducidad informada)"
+          }
+        }
+      }
+    },
+    "Account valid until %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta válida hasta el %@"
+          }
+        }
+      }
+    },
+    "Account valid, but the panel reports it expired on %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta válida, pero el panel indica que caducó el %@"
+          }
+        }
+      }
+    },
+    "Add to Favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir a favoritos"
+          }
+        }
+      }
+    },
+    "After the fast attempts, IronTV keeps retrying indefinitely at a slower, capped cadence — a live stream never gives up. Reconnect pacing applies to both engines; buffering and frozen-video detection are Apple-engine health checks.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tras los intentos rápidos, IronTV sigue reintentando indefinidamente a un ritmo más lento y limitado; un directo nunca se rinde. El ritmo de reconexión aplica a ambos motores; la detección de búfer y de vídeo congelado son comprobaciones del motor de Apple."
+          }
+        }
+      }
+    },
+    "All Channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos los canales"
+          }
+        }
+      }
+    },
+    "Apple": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
+    "Apple (HLS)": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
+    "Apple engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor Apple"
+          }
+        }
+      }
+    },
+    "Auto-reconnect": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconexión automática"
+          }
+        }
+      }
+    },
+    "Automatic": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automático"
+          }
+        }
+      }
+    },
+    "Automatic starts with the Apple player and silently switches a channel to the VLC engine (raw MPEG-TS, like most IPTV apps) when it keeps stalling or uses unsupported codecs. The player shows which engine is active in its toolbar.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automático empieza con el reproductor de Apple y cambia un canal al motor VLC en silencio (MPEG-TS en bruto, como la mayoría de apps IPTV) cuando se corta continuamente o usa códecs no compatibles. El reproductor muestra el motor activo en su barra de herramientas."
+          }
+        }
+      }
+    },
+    "Awaiting HTTP confirmation": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando confirmación HTTP"
+          }
+        }
+      }
+    },
+    "Buffering (Apple engine)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Búfer (motor Apple)"
+          }
+        }
+      }
+    },
+    "Buffering…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando búfer…"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Categories": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Categorías"
+          }
+        }
+      }
+    },
+    "Changes apply from the next stream start or reconnect.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los cambios se aplican a partir del siguiente inicio de stream o reconexión."
+          }
+        }
+      }
+    },
+    "Channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canales"
+          }
+        }
+      }
+    },
+    "Continue with HTTP": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuar con HTTP"
+          }
+        }
+      }
+    },
+    "Could not build a playable URL for this channel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo construir una URL reproducible para este canal."
+          }
+        }
+      }
+    },
+    "Could not build a valid request URL for this panel.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo construir una URL de solicitud válida para este panel."
+          }
+        }
+      }
+    },
+    "Couldn't read the saved account": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer la cuenta guardada"
+          }
+        }
+      }
+    },
+    "Current account": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta actual"
+          }
+        }
+      }
+    },
+    "Done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hecho"
+          }
+        }
+      }
+    },
+    "Engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor"
+          }
+        }
+      }
+    },
+    "Fast reconnect attempts": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intentos rápidos de reconexión"
+          }
+        }
+      }
+    },
+    "Fast start (may stutter on weak connections)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inicio rápido (puede entrecortarse con conexiones débiles)"
+          }
+        }
+      }
+    },
+    "Favorite": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorito"
+          }
+        }
+      }
+    },
+    "Favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoritos"
+          }
+        }
+      }
+    },
+    "Floating mini player": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minirreproductor flotante"
+          }
+        }
+      }
+    },
+    "Floating mini player (always on top)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minirreproductor flotante (siempre visible)"
+          }
+        }
+      }
+    },
+    "Focus a channel and press Play/Pause to add it, or hold for more options.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enfoca un canal y pulsa reproducir/pausa para añadirlo, o mantén pulsado para más opciones."
+          }
+        }
+      }
+    },
+    "Forward buffer": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Búfer de avance"
+          }
+        }
+      }
+    },
+    "HTTP (unencrypted)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTP (sin cifrar)"
+          }
+        }
+      }
+    },
+    "HTTPS (panel API encrypted)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTPS (API del panel cifrada)"
+          }
+        }
+      }
+    },
+    "Health check interval": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intervalo de comprobación"
+          }
+        }
+      }
+    },
+    "Hide": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar"
+          }
+        }
+      }
+    },
+    "Hide playlist URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar URL de la lista"
+          }
+        }
+      }
+    },
+    "If this started after reinstalling or updating the app, removing the stored account and adding it again resolves it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si esto empezó tras reinstalar o actualizar la app, eliminar la cuenta guardada y añadirla de nuevo lo resuelve."
+          }
+        }
+      }
+    },
+    "IronTV": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
+    "Keychain error (%@).": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error del llavero (%@)."
+          }
+        }
+      }
+    },
+    "License": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licencia"
+          }
+        }
+      }
+    },
+    "License file missing from the app bundle.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falta el archivo de licencia en el paquete de la app."
+          }
+        }
+      }
+    },
+    "Live delay (stall cushion)": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retardo del directo (colchón ante cortes)"
+          }
+        }
+      }
+    },
+    "Loading categories…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando categorías…"
+          }
+        }
+      }
+    },
+    "Loading channels…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando canales…"
+          }
+        }
+      }
+    },
+    "Loading stream…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando stream…"
+          }
+        }
+      }
+    },
+    "Network": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Red"
+          }
+        }
+      }
+    },
+    "Network error: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error de red: %@"
+          }
+        }
+      }
+    },
+    "No HTTPS endpoint answered on this server. Over plain HTTP, anyone on the network path can read your username, password, and what you watch. Continue only if you accept that.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún punto HTTPS respondió en este servidor. Con HTTP sin cifrar, cualquiera en la ruta de red puede leer tu usuario, tu contraseña y lo que ves. Continúa solo si lo aceptas."
+          }
+        }
+      }
+    },
+    "No account configured": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ninguna cuenta configurada"
+          }
+        }
+      }
+    },
+    "No favorites yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay favoritos"
+          }
+        }
+      }
+    },
+    "Not a favorite": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No favorito"
+          }
+        }
+      }
+    },
+    "Open Settings…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir Ajustes…"
+          }
+        }
+      }
+    },
+    "Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pega la URL de la lista M3U de tu proveedor. IronTV solo extrae de ella el servidor y las credenciales; la lista en sí nunca se descarga. La URL contiene tu contraseña, por eso se oculta mientras escribes y se borra al guardar la cuenta."
+          }
+        }
+      }
+    },
+    "Paste your provider's playlist URL in Settings to get started.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pega la URL de la lista de tu proveedor en Ajustes para empezar."
+          }
+        }
+      }
+    },
+    "Playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproducción"
+          }
+        }
+      }
+    },
+    "Playback engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor de reproducción"
+          }
+        }
+      }
+    },
+    "Playback failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fallo de reproducción"
+          }
+        }
+      }
+    },
+    "Playback was stopped: the stream tried to move to an insecure or different server.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La reproducción se detuvo: el stream intentó cambiar a un servidor inseguro o distinto."
+          }
+        }
+      }
+    },
+    "Playing with the Apple engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduciendo con el motor Apple"
+          }
+        }
+      }
+    },
+    "Playing with the VLC engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduciendo con el motor VLC"
+          }
+        }
+      }
+    },
+    "Playlist URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL de la lista"
+          }
+        }
+      }
+    },
+    "Reconnect after buffering for": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconectar tras cargar búfer durante"
+          }
+        }
+      }
+    },
+    "Reconnect after frozen video for": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconectar tras vídeo congelado durante"
+          }
+        }
+      }
+    },
+    "Reconnecting…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconectando…"
+          }
+        }
+      }
+    },
+    "Remove Account": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar cuenta"
+          }
+        }
+      }
+    },
+    "Remove Stored Account": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar cuenta guardada"
+          }
+        }
+      }
+    },
+    "Remove from Favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar de favoritos"
+          }
+        }
+      }
+    },
+    "Restore Defaults": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar valores predeterminados"
+          }
+        }
+      }
+    },
+    "Resync audio/video with the live stream": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resincronizar audio/vídeo con la emisión en directo"
+          }
+        }
+      }
+    },
+    "Resync with the live stream": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resincronizar con la emisión en directo"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        }
+      }
+    },
+    "Return to the main window": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a la ventana principal"
+          }
+        }
+      }
+    },
+    "Right-click any channel and choose “Add to Favorites”.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haz clic derecho en cualquier canal y elige “Añadir a favoritos”."
+          }
+        }
+      }
+    },
+    "Running tests": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ejecutando pruebas"
+          }
+        }
+      }
+    },
+    "Sample channels play free public demo streams — no subscription needed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los canales de ejemplo reproducen emisiones públicas gratuitas; no hace falta suscripción."
+          }
+        }
+      }
+    },
+    "Search channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar canales"
+          }
+        }
+      }
+    },
+    "Select a category": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona una categoría"
+          }
+        }
+      }
+    },
+    "Select a channel to start watching": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecciona un canal para empezar a ver"
+          }
+        }
+      }
+    },
+    "Server": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servidor"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "Show": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar"
+          }
+        }
+      }
+    },
+    "Show playlist URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar URL de la lista"
+          }
+        }
+      }
+    },
+    "Stream playback follows the URLs your panel serves; their transport is controlled by the provider.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La reproducción sigue las URL que sirve tu panel; su transporte lo controla el proveedor."
+          }
+        }
+      }
+    },
+    "Tap the star on any channel to add it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca la estrella de cualquier canal para añadirlo."
+          }
+        }
+      }
+    },
+    "The URL has no password parameter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La URL no tiene el parámetro password."
+          }
+        }
+      }
+    },
+    "The URL has no username parameter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La URL no tiene el parámetro username."
+          }
+        }
+      }
+    },
+    "The panel answered with HTTP %@.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel respondió con HTTP %@."
+          }
+        }
+      }
+    },
+    "The panel rejected these credentials (HTTP %@).": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel rechazó estas credenciales (HTTP %@)."
+          }
+        }
+      }
+    },
+    "The panel rejected these credentials (status: %@).": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel rechazó estas credenciales (estado: %@)."
+          }
+        }
+      }
+    },
+    "The panel rejected these credentials.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel rechazó estas credenciales."
+          }
+        }
+      }
+    },
+    "The panel sent a response this app couldn't read.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El panel envió una respuesta que esta app no pudo leer."
+          }
+        }
+      }
+    },
+    "The stored account could not be accessed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo acceder a la cuenta guardada."
+          }
+        }
+      }
+    },
+    "The stored account could not be read.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo leer la cuenta guardada."
+          }
+        }
+      }
+    },
+    "These apply to the Apple engine only — the VLC engine uses a fixed 3-second network cache. A larger live delay starts playback further behind the live edge, absorbing network hiccups at the cost of being more seconds behind the broadcast; it is automatically capped to a third of the panel's live window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto aplica solo al motor de Apple; el motor VLC usa una caché de red fija de 3 segundos. Un retardo del directo mayor inicia la reproducción más lejos del borde en vivo, absorbiendo cortes de red a costa de ir más segundos por detrás de la emisión; se limita automáticamente a un tercio de la ventana en vivo del panel."
+          }
+        }
+      }
+    },
+    "This channel advertises no format this device can play.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este canal no anuncia ningún formato que este dispositivo pueda reproducir."
+          }
+        }
+      }
+    },
+    "This doesn't look like a URL. Paste the full playlist URL from your provider.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto no parece una URL. Pega la URL completa de la lista de tu proveedor."
+          }
+        }
+      }
+    },
+    "This provider uses plain HTTP": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este proveedor usa HTTP sin cifrar"
+          }
+        }
+      }
+    },
+    "Toggle Full Screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alternar pantalla completa"
+          }
+        }
+      }
+    },
+    "Toggle full screen": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alternar pantalla completa"
+          }
+        }
+      }
+    },
+    "Transport": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transporte"
+          }
+        }
+      }
+    },
+    "Try Again": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        }
+      }
+    },
+    "Try Sample Channels": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Probar canales de ejemplo"
+          }
+        }
+      }
+    },
+    "Unsupported scheme “%@” — the playlist URL must start with http:// or https://.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquema no compatible “%@”: la URL de la lista debe empezar por http:// o https://."
+          }
+        }
+      }
+    },
+    "Username": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usuario"
+          }
+        }
+      }
+    },
+    "VLC": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
+    "VLC (MPEG-TS)": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
+    "VLC engine": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor VLC"
+          }
+        }
+      }
+    },
+    "Validate & Save": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Validar y guardar"
+          }
+        }
+      }
+    },
+    "Validating…": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Validando…"
+          }
+        }
+      }
+    },
+    "http://host.example.com:8080/get.php?username=…&password=…": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    }
+  },
+  "version": "1.0"
+}

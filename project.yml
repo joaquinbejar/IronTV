@@ -1,6 +1,9 @@
 name: IronTV
 options:
   bundleIdPrefix: com.taunais
+  # Base language of Sources/Localizable.xcstrings; translations (es) ship
+  # from the same catalog.
+  developmentLanguage: en
   deploymentTarget:
     macOS: "14.0"
     iOS: "17.0"

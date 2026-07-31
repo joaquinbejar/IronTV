@@ -15,24 +15,46 @@ struct ChannelRow: View {
 
             Text(stream.name)
                 .lineLimit(1)
+                #if !os(tvOS)
+                // The favorite state rides the name element; the star button
+                // stays its own accessibility element so VoiceOver can act on
+                // it directly.
+                .accessibilityValue(isFavorite ? Text("Favorite") : Text("Not a favorite"))
+                #endif
 
             Spacer()
 
             #if os(tvOS)
             // Rows are single focusables on tvOS — the star is an indicator;
             // toggling happens via long-press menu or the play/pause button.
+            // Never color-only: filled vs outline carries the state, and the
+            // row's accessibility value carries it for VoiceOver.
             Image(systemName: isFavorite ? "star.fill" : "star")
                 .foregroundStyle(isFavorite ? .yellow : .secondary)
+                .accessibilityHidden(true)
             #else
             Button(action: toggleFavorite) {
                 Image(systemName: isFavorite ? "star.fill" : "star")
                     .foregroundStyle(isFavorite ? .yellow : .secondary)
             }
             .buttonStyle(.borderless)
+            // Text-based so the label resolves through the String Catalog —
+            // a plain String ternary would reach VoiceOver untranslated.
+            .accessibilityLabel(isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites"))
+            .accessibilityIdentifier("channel.favoriteToggle")
             #endif
         }
+        #if os(tvOS)
+        // The whole row is one focusable with no inner controls, so one
+        // combined element carrying the favorite state is the right shape
+        // here — unlike the pointer/touch row, whose button stays separate.
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isFavorite ? Text("Favorite") : Text("Not a favorite"))
+        #endif
         .contextMenu {
-            Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", action: toggleFavorite)
+            Button(action: toggleFavorite) {
+                isFavorite ? Text("Remove from Favorites") : Text("Add to Favorites")
+            }
         }
     }
 }

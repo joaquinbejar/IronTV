@@ -45,6 +45,8 @@ struct DesktopBrowserShell: View {
                             } label: {
                                 Image(systemName: "gearshape")
                             }
+                            .accessibilityLabel("Settings")
+                            .accessibilityIdentifier("browser.settingsButton")
                         }
                     }
             } content: {
@@ -74,6 +76,8 @@ struct DesktopBrowserShell: View {
                             } label: {
                                 Image(systemName: "gearshape")
                             }
+                            .accessibilityLabel("Settings")
+                            .accessibilityIdentifier("browser.settingsButton")
                         }
                     }
                 #endif
@@ -168,6 +172,7 @@ struct DesktopBrowserShell: View {
                     Image(systemName: "star")
                         .font(.system(size: 28))
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text("No favorites yet")
                         .font(.headline)
                     // The hint must name the interaction each platform

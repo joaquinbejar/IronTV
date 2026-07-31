@@ -18,12 +18,12 @@ final class SettingsViewModel: ObservableObject {
     /// DTO mapping), and the inconsistent case where authentication succeeded
     /// but the reported expiry is not in the future.
     static func successMessage(expiryDate: Date?, now: Date = Date()) -> String {
-        guard let expiryDate else { return "Account valid (no expiry reported)" }
+        guard let expiryDate else { return String(localized: "Account valid (no expiry reported)") }
         let formatted = expiryDate.formatted(date: .abbreviated, time: .omitted)
         if expiryDate <= now {
-            return "Account valid, but the panel reports it expired on \(formatted)"
+            return String(localized: "Account valid, but the panel reports it expired on \(formatted)")
         }
-        return "Account valid until \(formatted)"
+        return String(localized: "Account valid until \(formatted)")
     }
 
     /// The pasted playlist URL. It carries the account password, so it is
@@ -208,7 +208,8 @@ final class SettingsViewModel: ObservableObject {
                         // Same authority, HTTP-level: an explicit credential
                         // rejection over TLS must never turn into an offer to
                         // retry in the clear.
-                        phase = .failure("The panel rejected these credentials (HTTP \(code)).")
+                        let codeText = "\(code)"
+                        phase = .failure(String(localized: "The panel rejected these credentials (HTTP \(codeText))."))
                         return
                     case .failure(is CancellationError):
                         return
@@ -277,8 +278,10 @@ final class SettingsViewModel: ObservableObject {
     }
 
     private static func rejectionMessage(for status: AccountStatus) -> String {
-        let detail = status.status.map { " (status: \($0))" } ?? ""
-        return "The panel rejected these credentials\(detail)."
+        guard let detail = status.status else {
+            return String(localized: "The panel rejected these credentials.")
+        }
+        return String(localized: "The panel rejected these credentials (status: \(detail)).")
     }
 
     /// The account rebased onto the panel's advertised TLS port. nil when the

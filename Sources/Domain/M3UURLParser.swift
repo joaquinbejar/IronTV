@@ -14,13 +14,13 @@ public enum M3UURLParseError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notAURL:
-            return "This doesn't look like a URL. Paste the full playlist URL from your provider."
+            return String(localized: "This doesn't look like a URL. Paste the full playlist URL from your provider.")
         case .unsupportedScheme(let scheme):
-            return "Unsupported scheme “\(scheme)” — the playlist URL must start with http:// or https://."
+            return String(localized: "Unsupported scheme “\(scheme)” — the playlist URL must start with http:// or https://.")
         case .missingUsername:
-            return "The URL has no username parameter."
+            return String(localized: "The URL has no username parameter.")
         case .missingPassword:
-            return "The URL has no password parameter."
+            return String(localized: "The URL has no password parameter.")
         }
     }
 }
