@@ -1113,17 +1113,6 @@
         }
       }
     },
-    "Toggle full screen": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alternar pantalla completa"
-          }
-        }
-      }
-    },
     "Transport": {
       "extractionState": "manual",
       "localizations": {

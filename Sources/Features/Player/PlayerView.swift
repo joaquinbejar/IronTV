@@ -84,7 +84,10 @@ struct PlayerView: View {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                         }
                         .help("Toggle Full Screen")
-                        .accessibilityLabel("Toggle full screen")
+                        // Same key as the help text: keys differing only in
+                        // case collide in Xcode's generated catalog symbols
+                        // and break Product → Archive.
+                        .accessibilityLabel("Toggle Full Screen")
                         .accessibilityIdentifier("player.fullScreenButton")
                     }
                     #endif
