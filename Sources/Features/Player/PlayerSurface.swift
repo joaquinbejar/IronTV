@@ -11,7 +11,7 @@ struct PlayerSurface: NSViewRepresentable {
     /// draws into a plain `NSView` drawable that AVKit cannot capture, so PiP is
     /// only offered while the Apple engine owns the surface — putting the VLC
     /// video in PiP would mean a custom sample-buffer implementation.
-    var allowsPictureInPicture = true
+    let allowsPictureInPicture: Bool
 
     func makeNSView(context: Context) -> AVPlayerView {
         let view = AVPlayerView()
