@@ -25,6 +25,14 @@ final class PlayerViewModel: ObservableObject {
         case vlc
     }
 
+    /// Whether the Apple video surface may offer Picture in Picture. AVKit's
+    /// PiP is bound to an `AVPlayer`, so it can only ever show the Apple
+    /// engine's video: while VLC is playing, the AVPlayer is parked and empty
+    /// (see ``replacePlayer()``) and a PiP window would be black.
+    nonisolated static func allowsPictureInPicture(for engine: Engine) -> Bool {
+        engine == .avPlayer
+    }
+
     @Published private(set) var engine: Engine = .avPlayer
     /// Streams whose codecs AVPlayer already rejected this session — zap
     /// straight to VLC next time.

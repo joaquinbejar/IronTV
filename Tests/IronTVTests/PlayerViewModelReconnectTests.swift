@@ -243,6 +243,17 @@ final class PlayerViewModelReconnectTests: XCTestCase {
         XCTAssertEqual(viewModel.currentURL, hlsURL)
     }
 
+    // MARK: - Picture in Picture availability
+
+    /// AVKit's PiP can only ever show the Apple engine's `AVPlayer`. While VLC
+    /// plays, that player is parked and empty, so offering PiP would hand the
+    /// user a black window.
+    func testPictureInPictureIsOnlyOfferedForTheAppleEngine() {
+        XCTAssertTrue(PlayerViewModel.allowsPictureInPicture(for: .avPlayer))
+        XCTAssertFalse(PlayerViewModel.allowsPictureInPicture(for: .vlc),
+                       "PiP over the VLC engine shows an empty AVPlayer — a black window")
+    }
+
     // MARK: - Geometry restarts
 
     func testGeometryMaterialityRules() {
