@@ -26,6 +26,12 @@ public final class M3UCatalogClient: @unchecked Sendable {
     private let session: URLSession
     private let cacheLifetime: TimeInterval
     private let now: @Sendable () -> Date
+    /// On-disk copy, so the expiry survives relaunches instead of applying
+    /// only within one client instance. nil disables persistence entirely.
+    private let diskCache: PlaylistCacheStore?
+    /// Digest of the account, used as the cache file name — never the host,
+    /// the username or the playlist URL.
+    private let cacheNamespace: String?
 
     /// `@unchecked Sendable` with an explicit lock rather than an actor: the
     /// ``ChannelBrowsing/playbackURL(for:format:)`` requirement is synchronous
@@ -48,19 +54,28 @@ public final class M3UCatalogClient: @unchecked Sendable {
         panelHost: URL,
         cacheLifetime: TimeInterval,
         session: URLSession = .shared,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        diskCache: PlaylistCacheStore? = nil,
+        cacheNamespace: String? = nil
     ) {
         self.playlistURL = playlistURL
         self.panelHost = panelHost
         self.session = session
         self.cacheLifetime = cacheLifetime
         self.now = now
+        self.diskCache = diskCache
+        self.cacheNamespace = cacheNamespace
     }
 
     /// Drops the cached playlist so the next read re-fetches. The explicit
     /// refresh the user asks for must never be answered from cache.
     public func invalidateCachedCatalog() async {
         invalidateCache()
+        // The disk copy too: an explicit refresh that left it in place would
+        // be answered from disk on the very next launch.
+        if let diskCache, let cacheNamespace {
+            diskCache.remove(namespace: cacheNamespace)
+        }
     }
 
     public func invalidateCache() {
@@ -86,10 +101,10 @@ public final class M3UCatalogClient: @unchecked Sendable {
                 return .join(inFlight)
             }
             let task = Task { [self] () throws -> Snapshot in
-                let entries = try await fetchEntries()
+                let (entries, fetchedAt) = try await loadEntries()
                 let built = Self.build(from: entries)
                 return Snapshot(
-                    fetchedAt: now(),
+                    fetchedAt: fetchedAt,
                     categories: built.categories,
                     streams: built.streams,
                     urlsByStream: built.urlsByStream
@@ -120,19 +135,49 @@ public final class M3UCatalogClient: @unchecked Sendable {
         }
     }
 
+    /// Disk first, network second. The on-disk copy is what makes the expiry
+    /// mean anything across relaunches; a miss for any reason — absent, stale,
+    /// unreadable, purged by the system under storage pressure — is simply a
+    /// download.
+    ///
+    /// Returns the timestamp the snapshot should carry, so a body reused from
+    /// disk expires on its own age rather than restarting the clock on every
+    /// launch.
+    private func loadEntries() async throws -> ([M3UEntry], Date) {
+        if let diskCache, let cacheNamespace,
+           let hit = diskCache.load(namespace: cacheNamespace, lifetime: cacheLifetime, now: now()),
+           let entries = try? M3UPlaylistParser.parse(hit.body) {
+            // Aged from when it was downloaded, not from now: a relaunch must
+            // not restart the expiry the user configured.
+            return (entries, hit.writtenAt)
+        }
+        let (entries, body) = try await fetchEntries()
+        if let diskCache, let cacheNamespace {
+            diskCache.save(body, namespace: cacheNamespace)
+        }
+        return (entries, now())
+    }
+
     /// Streamed line by line rather than decoded into one `String`: provider
     /// playlists reach tens of megabytes and 100k+ entries, and tvOS has the
-    /// least memory of the three targets.
-    private func fetchEntries() async throws -> [M3UEntry] {
+    /// least memory of the three targets. The body is accumulated only when
+    /// there is a disk cache to write it to.
+    private func fetchEntries() async throws -> ([M3UEntry], String) {
         let (bytes, response) = try await session.bytes(from: playlistURL)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw XtreamAPIError.httpStatus(http.statusCode)
         }
+        let persisting = diskCache != nil && cacheNamespace != nil
         var parser = M3UPlaylistParser()
+        var body = ""
         for try await line in bytes.lines {
             parser.consume(line: line)
+            if persisting {
+                body += line
+                body += "\n"
+            }
         }
-        return try parser.finish()
+        return (try parser.finish(), body)
     }
 
     /// Stable identifiers derived from the entry's own identity rather than

@@ -328,7 +328,12 @@ final class ChannelsViewModel: ObservableObject {
             return M3UCatalogClient(
                 playlistURL: account.playlistURL ?? account.host,
                 panelHost: account.host,
-                cacheLifetime: settings.playlistCacheHours * 3600
+                cacheLifetime: settings.playlistCacheHours * 3600,
+                // Persisted per account, so the expiry the user set survives
+                // relaunches. The namespace is a digest — the file name
+                // carries no host, username or playlist URL.
+                diskCache: PlaylistCacheStore(),
+                cacheNamespace: account.identity.storageNamespace
             )
         }
     }

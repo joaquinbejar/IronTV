@@ -124,7 +124,11 @@ final class M3UCatalogClientCacheTests: XCTestCase {
         override func stopLoading() {}
     }
 
-    private func makeClient(cacheLifetime: TimeInterval, now: @escaping @Sendable () -> Date) -> M3UCatalogClient {
+    private func makeClient(
+        cacheLifetime: TimeInterval,
+        now: @escaping @Sendable () -> Date,
+        diskCache: PlaylistCacheStore? = nil
+    ) -> M3UCatalogClient {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CountingProtocol.self]
         return M3UCatalogClient(
@@ -132,8 +136,48 @@ final class M3UCatalogClientCacheTests: XCTestCase {
             panelHost: URL(string: "http://host.example.com")!,
             cacheLifetime: cacheLifetime,
             session: URLSession(configuration: configuration),
-            now: now
+            now: now,
+            diskCache: diskCache,
+            cacheNamespace: diskCache == nil ? nil : "v1.testnamespace"
         )
+    }
+
+    /// The finding this exists for: without a disk copy the expiry applied
+    /// only within one client instance, so the default 24 hours still
+    /// downloaded the whole playlist on every launch.
+    func testASecondClientReusesThePlaylistFromDisk() async throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("M3UDiskCacheTests.\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let disk = PlaylistCacheStore(directory: directory)
+
+        let first = makeClient(cacheLifetime: 3600, now: { Date() }, diskCache: disk)
+        _ = try await first.liveCategories()
+        XCTAssertEqual(CountingProtocol.count, 1)
+
+        // A fresh client is what a relaunch looks like from here.
+        let second = makeClient(cacheLifetime: 3600, now: { Date() }, diskCache: disk)
+        _ = try await second.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 1, "the relaunch must be served from disk")
+    }
+
+    /// An explicit refresh has to clear the disk copy too, or the next launch
+    /// is answered from the very file the user asked to replace.
+    func testAnExplicitRefreshAlsoClearsTheDiskCopy() async throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("M3UDiskCacheTests.\(UUID())", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let disk = PlaylistCacheStore(directory: directory)
+
+        let first = makeClient(cacheLifetime: 3600, now: { Date() }, diskCache: disk)
+        _ = try await first.liveCategories()
+        await first.invalidateCachedCatalog()
+
+        let second = makeClient(cacheLifetime: 3600, now: { Date() }, diskCache: disk)
+        _ = try await second.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 2)
     }
 
     override func setUp() {
@@ -188,5 +232,82 @@ final class M3UCatalogClientCacheTests: XCTestCase {
         private var date = Date(timeIntervalSince1970: 1_000_000)
         var now: Date { lock.withLock { date } }
         func advance(by seconds: TimeInterval) { lock.withLock { date += seconds } }
+    }
+}
+
+/// The on-disk half of the cache: what makes the Settings expiry mean anything
+/// across relaunches rather than only within one client instance.
+final class PlaylistCacheStoreTests: XCTestCase {
+
+    private var directory: URL!
+    private var store: PlaylistCacheStore!
+    private let namespace = "v1.abcdef0123456789"
+    private let body = "#EXTM3U\n#EXTINF:-1,A\nhttp://host.example.com/stream/1.m3u8\n"
+    private let epoch = Date(timeIntervalSince1970: 1_000_000)
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        directory = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("PlaylistCacheStoreTests.\(UUID())", isDirectory: true)
+        store = PlaylistCacheStore(directory: directory)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+        try super.tearDownWithError()
+    }
+
+    func testAMissReturnsNilRatherThanFailing() {
+        XCTAssertNil(store.load(namespace: namespace, lifetime: 3600, now: epoch))
+    }
+
+    func testASavedPlaylistComesBackWithinItsLifetime() throws {
+        store.save(body, namespace: namespace)
+        let hit = try XCTUnwrap(store.load(namespace: namespace, lifetime: 3600, now: Date()))
+        XCTAssertEqual(hit.body, body)
+    }
+
+    /// The timestamp is the download's, not the read's — otherwise every
+    /// relaunch would restart the expiry the user configured.
+    func testTheTimestampIsWhenItWasWrittenNotWhenItWasRead() throws {
+        let before = Date()
+        store.save(body, namespace: namespace)
+        let hit = try XCTUnwrap(store.load(namespace: namespace, lifetime: 3600, now: Date()))
+        XCTAssertGreaterThanOrEqual(hit.writtenAt.timeIntervalSince1970, before.timeIntervalSince1970 - 2)
+        XCTAssertLessThanOrEqual(hit.writtenAt.timeIntervalSince1970, Date().timeIntervalSince1970 + 2)
+    }
+
+    func testAnExpiredCopyIsAMiss() {
+        store.save(body, namespace: namespace)
+        let farFuture = Date().addingTimeInterval(7200)
+        XCTAssertNil(store.load(namespace: namespace, lifetime: 3600, now: farFuture))
+    }
+
+    /// Two accounts must not read each other's playlist.
+    func testNamespacesAreIsolated() {
+        store.save(body, namespace: namespace)
+        XCTAssertNil(store.load(namespace: "v1.9999999999999999", lifetime: 3600, now: Date()))
+    }
+
+    func testRemoveIsAMissAfterwards() {
+        store.save(body, namespace: namespace)
+        store.remove(namespace: namespace)
+        XCTAssertNil(store.load(namespace: namespace, lifetime: 3600, now: Date()))
+    }
+
+    /// A cache that cannot be read must never be able to break the app.
+    func testCorruptDataDoesNotThrow() throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("\(namespace).m3u")
+        try Data([0xFF, 0xFE, 0xFD]).write(to: url)
+        XCTAssertNil(store.load(namespace: namespace, lifetime: 3600, now: Date()))
+    }
+
+    /// The file name is a digest, so nothing on disk names the account.
+    func testTheFileNameCarriesNoAccountMetadata() throws {
+        store.save(body, namespace: namespace)
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        XCTAssertEqual(names, ["\(namespace).m3u"])
+        XCTAssertFalse(names.contains { $0.contains("host") || $0.contains("http") })
     }
 }

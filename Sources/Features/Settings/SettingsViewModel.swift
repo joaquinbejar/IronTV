@@ -167,7 +167,9 @@ final class SettingsViewModel: ObservableObject {
                 playlistURL: account.playlistURL ?? account.host,
                 panelHost: account.host,
                 // Validation must reflect the provider right now, never a
-                // cached answer from a previous attempt.
+                // cached answer from a previous attempt — and it deliberately
+                // gets no disk cache, so an account the user is only trying
+                // out never leaves a playlist behind on their device.
                 cacheLifetime: 0
             )
         }
