@@ -48,16 +48,104 @@ final class PlayerViewModel: ObservableObject {
 
     func setMuted(_ muted: Bool) {
         isMuted = muted
-        applyMute()
+        applyAudio()
     }
 
-    /// Re-applied after every engine swap: a fresh `AVPlayer` starts unmuted,
-    /// and a fresh `VLCMediaPlayer` has its own audio controller.
-    private func applyMute() {
+    /// 0...1. VLC counts 0...100 with 100 as nominal; AVPlayer counts 0...1.
+    @Published private(set) var volume: Double = 1
+
+    func setVolume(_ newValue: Double) {
+        volume = min(max(newValue, 0), 1)
+        applyAudio()
+    }
+
+    /// Re-applied after every engine swap: a fresh `AVPlayer` starts unmuted
+    /// at full volume, and a fresh `VLCMediaPlayer` has its own audio
+    /// controller.
+    private func applyAudio() {
         player.isMuted = isMuted
+        player.volume = Float(volume)
         #if canImport(VLCKitSPM)
         vlcPlayer?.audio?.isMuted = isMuted
+        vlcPlayer?.audio?.volume = Int32((volume * 100).rounded())
         #endif
+    }
+
+    /// What the transport controls render. Derived from the playback state
+    /// rather than stored beside it: a second copy of "is it playing" drifts
+    /// from the engine the moment a reconnect or a fallback happens.
+    enum Transport: Equatable {
+        case unavailable
+        case loading
+        case playing
+        case paused
+        case buffering
+        case reconnecting
+        case failed
+    }
+
+    nonisolated static func transport(for state: State, isPaused: Bool, hasStream: Bool) -> Transport {
+        guard hasStream else { return .unavailable }
+        switch state {
+        case .idle: return .unavailable
+        case .loading: return .loading
+        case .failed: return .failed
+        case .reconnecting: return .reconnecting
+        // A pause the user asked for outranks the engine's own churn: VLC
+        // keeps emitting .buffering while paused, and flickering the button
+        // back to "pause" under the finger reads as the tap being lost.
+        case .buffering: return isPaused ? .paused : .buffering
+        case .playing: return isPaused ? .paused : .playing
+        }
+    }
+
+    var transport: Transport {
+        Self.transport(for: state, isPaused: isPaused, hasStream: currentStream != nil)
+    }
+
+    /// Whether a play/pause request means anything right now. Loading,
+    /// reconnecting and failed are not actionable: the glyph is derived from
+    /// the transport state, so toggling there would flip hidden state without
+    /// changing the icon, and would call pause() on a player that is still
+    /// opening or recovering.
+    nonisolated static func canTogglePlayPause(_ transport: Transport) -> Bool {
+        switch transport {
+        case .playing, .paused, .buffering:
+            return true
+        case .unavailable, .loading, .reconnecting, .failed:
+            return false
+        }
+    }
+
+    var canTogglePlayPause: Bool {
+        Self.canTogglePlayPause(transport)
+    }
+
+    /// User-requested pause. Never set from engine events: VLC reports
+    /// .paused for its own reasons mid-reconnect, and inheriting that would
+    /// leave the UI claiming a pause the user never asked for.
+    @Published private(set) var isPaused = false
+
+    func togglePlayPause() {
+        setPaused(!isPaused)
+    }
+
+    func setPaused(_ paused: Bool) {
+        // Guarded here as well as in the UI: the tvOS remote's play/pause
+        // button reaches this without going through the control bar at all.
+        guard canTogglePlayPause else { return }
+        isPaused = paused
+        if paused {
+            player.pause()
+            #if canImport(VLCKitSPM)
+            vlcPlayer?.pause()
+            #endif
+        } else {
+            player.play()
+            #if canImport(VLCKitSPM)
+            vlcPlayer?.play()
+            #endif
+        }
     }
 
     /// Streams whose codecs AVPlayer already rejected this session — zap
@@ -175,7 +263,7 @@ final class PlayerViewModel: ObservableObject {
         }
         player = AVPlayer()
         configureTimeControlObservation()
-        applyMute()
+        applyAudio()
     }
 
     /// Recreated on every (re)connection: synchronous calls on a wedged
@@ -318,6 +406,7 @@ final class PlayerViewModel: ObservableObject {
         stopVLC()
         engine = .avPlayer
         replacePlayer() // disposes the old (possibly wedged) player off-main
+        isPaused = false
         currentStream = nil
         currentURL = nil
         currentTSURL = nil
@@ -342,6 +431,7 @@ final class PlayerViewModel: ObservableObject {
         stopVLC()
         engine = .avPlayer
         replacePlayer()
+        isPaused = false
         currentStream = stream
         currentURL = url
         state = initialState
@@ -722,6 +812,7 @@ final class PlayerViewModel: ObservableObject {
         replacePlayer() // park the AVPlayer
 
         engine = .vlc
+        isPaused = false
         currentStream = stream
         // Every VLC start defines the geometry baseline: only a MATERIAL size
         // change after this point justifies a geometry restart. Unknown (the
@@ -749,9 +840,9 @@ final class PlayerViewModel: ObservableObject {
         // play() is dropped and the channel comes back loud; one applied only
         // after it leaves a brief window of sound. Setting it either side is
         // cheap and closes both.
-        applyMute()
+        applyAudio()
         player.play()
-        applyMute()
+        applyAudio()
     }
 
     /// True while a session is actually running — the only states from which
