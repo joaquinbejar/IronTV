@@ -150,6 +150,30 @@ struct PlayerView: View {
     /// full-screen) where the toolbar chip is unreachable.
     @State private var showEngineBadge = false
 
+    /// VLC transport controls: shown on interaction, hidden again after a
+    /// pause. The token restarts the hide countdown on every reveal, so the
+    /// bar does not vanish while the user is still using it.
+    @State private var showVLCControls = false
+    @State private var vlcControlsRevealToken = 0
+    private static let vlcControlsLinger: UInt64 = 4_000_000_000
+
+    /// Only the VLC engine needs these: AVPlayerView and VideoPlayer bring
+    /// their own transport bar, and a second one over them would fight it.
+    private var wantsVLCControls: Bool {
+        viewModel.engine == .vlc && viewModel.currentStream != nil
+    }
+
+    private func revealVLCControls() {
+        guard wantsVLCControls else { return }
+        showVLCControls = true
+        vlcControlsRevealToken &+= 1
+    }
+
+    private struct VLCControlsKey: Equatable {
+        let token: Int
+        let wanted: Bool
+    }
+
     private var core: some View {
         ZStack {
             videoSurface
@@ -193,6 +217,43 @@ struct PlayerView: View {
                         ? Text("Playing with the VLC engine")
                         : Text("Playing with the Apple engine"))
             }
+        }
+        .overlay(alignment: .bottom) {
+            if wantsVLCControls, showVLCControls {
+                PlayerControlsOverlay(viewModel: viewModel)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: showVLCControls)
+        // Reveal on any deliberate interaction. Simultaneous rather than
+        // exclusive so the Apple engine's own controls keep receiving taps.
+        .simultaneousGesture(TapGesture().onEnded { revealVLCControls() })
+        #if os(macOS)
+        .onContinuousHover { phase in
+            if case .active = phase { revealVLCControls() }
+        }
+        #endif
+        #if os(tvOS)
+        // The remote's play/pause button is the primary transport on tvOS,
+        // and it has to work whether or not the bar is currently on screen.
+        .onPlayPauseCommand {
+            guard wantsVLCControls else { return }
+            viewModel.togglePlayPause()
+            revealVLCControls()
+        }
+        .onMoveCommand { _ in revealVLCControls() }
+        #endif
+        .task(id: VLCControlsKey(token: vlcControlsRevealToken, wanted: wantsVLCControls)) {
+            // Same shape as the engine badge: bound to the transition, so a
+            // newer reveal (or leaving VLC) cancels the pending hide instead
+            // of letting an orphan timer close the bar under the user.
+            guard wantsVLCControls, showVLCControls else {
+                showVLCControls = false
+                return
+            }
+            try? await Task.sleep(nanoseconds: Self.vlcControlsLinger)
+            guard !Task.isCancelled else { return }
+            showVLCControls = false
         }
         .task(id: EngineBadgeKey(engine: viewModel.engine, generation: viewModel.playbackGeneration)) {
             // Chrome-less surfaces have no toolbar chip: show the active
