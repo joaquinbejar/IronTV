@@ -541,6 +541,17 @@
         }
       }
     },
+    "Mute": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar"
+          }
+        }
+      }
+    },
     "Network": {
       "extractionState": "manual",
       "localizations": {
@@ -1153,6 +1164,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Probar canales de ejemplo"
+          }
+        }
+      }
+    },
+    "Unmute": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activar sonido"
           }
         }
       }
