@@ -229,6 +229,81 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(spy.callCount, 0, "no request should be made for input that can't be parsed")
     }
 
+    // MARK: - Separate-fields mode
+
+    /// The whole point of the second mode: no query string is parsed, so a
+    /// provider spelling its parameters any way at all is irrelevant.
+    @MainActor
+    func testFieldsModeSavesTheAccountWithoutParsingAURL() async {
+        let store = FakeAccountStore()
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.inputMode = .separateFields
+        viewModel.scheme = .https
+        viewModel.hostText = "host.example.com:8080"
+        viewModel.usernameText = "user1"
+        viewModel.passwordText = "pass1"
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(store.saved?.host.absoluteString, "https://host.example.com:8080")
+        XCTAssertEqual(store.saved?.username, "user1")
+    }
+
+    /// Choosing http in the selector is a deliberate act, and it still has to
+    /// pass through the same confirmation the pasted-URL path uses — nothing
+    /// may leave the device in the clear before the user agrees.
+    @MainActor
+    func testFieldsModeOverHTTPStillAsksForConfirmation() async {
+        let store = FakeAccountStore()
+        let (viewModel, spy) = makeViewModel(
+            resultsByScheme: ["https": .failure(URLError(.cannotConnectToHost))]
+        )
+
+        viewModel.inputMode = .separateFields
+        viewModel.scheme = .http
+        viewModel.hostText = "host.example.com:8080"
+        viewModel.usernameText = "user1"
+        viewModel.passwordText = "pass1"
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
+        XCTAssertNil(store.saved, "nothing may be saved before the user agrees")
+        XCTAssertTrue(
+            spy.accounts.allSatisfy { $0.host.scheme == "https" },
+            "only the TLS twin may be contacted before confirmation"
+        )
+    }
+
+    /// A password typed in one mode must not survive into the other, where it
+    /// is no longer visible and the user cannot tell it is still there.
+    @MainActor
+    func testSwitchingModesClearsEveryCredentialField() {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.inputMode = .separateFields
+        viewModel.hostText = "host.example.com"
+        viewModel.usernameText = "user1"
+        viewModel.passwordText = "pass1"
+
+        viewModel.inputMode = .pastedURL
+
+        XCTAssertEqual(viewModel.hostText, "")
+        XCTAssertEqual(viewModel.usernameText, "")
+        XCTAssertEqual(viewModel.passwordText, "")
+        XCTAssertFalse(viewModel.canSubmit, "an empty form must not be submittable")
+    }
+
+    @MainActor
+    func testSwitchingAwayFromThePastedURLClearsItToo() {
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.urlText = validURL
+        viewModel.inputMode = .separateFields
+
+        XCTAssertEqual(viewModel.urlText, "")
+    }
+
     // MARK: - Cancellation, staleness, dismissal
 
     func testEditingDuringARequestDiscardsTheInFlightValidation() async {

@@ -87,10 +87,25 @@ final class CredentialFieldsParserTests: XCTestCase {
         }
     }
 
-    func testCredentialsAreTrimmed() throws {
-        let account = try parse(username: "  user \n", password: "  pass  ")
-        XCTAssertEqual(account.username, "user")
-        XCTAssertEqual(account.password, "pass")
+    /// Credentials are opaque. A password whose surrounding spaces are real
+    /// must survive: trimming would change it silently and leave the account
+    /// unable to authenticate, with nothing on screen to explain why. The
+    /// pasted-URL path preserves the decoded value the same way.
+    func testCredentialsArePreservedVerbatim() throws {
+        let account = try parse(username: "  user ", password: "  pass  ")
+        XCTAssertEqual(account.username, "  user ")
+        XCTAssertEqual(account.password, "  pass  ")
+    }
+
+    /// Whitespace still decides emptiness — a field holding only spaces was
+    /// not filled in, whatever it contains.
+    func testWhitespaceOnlyCredentialsAreStillRejected() {
+        XCTAssertThrowsError(try parse(username: " \n ")) { error in
+            XCTAssertEqual(error as? CredentialFieldsError, .missingUsername)
+        }
+        XCTAssertThrowsError(try parse(password: "   ")) { error in
+            XCTAssertEqual(error as? CredentialFieldsError, .missingPassword)
+        }
     }
 
     // MARK: - The URL the account goes on to build

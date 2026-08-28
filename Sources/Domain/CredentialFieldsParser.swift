@@ -56,14 +56,21 @@ public enum CredentialFieldsParser {
         password rawPassword: String,
         scheme: TransportScheme
     ) throws -> Account {
-        let username = rawUsername.trimmingCharacters(in: .whitespacesAndNewlines)
-        let password = rawPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let host = try hostURL(from: rawHost, scheme: scheme)
 
-        guard !username.isEmpty else { throw CredentialFieldsError.missingUsername }
-        guard !password.isEmpty else { throw CredentialFieldsError.missingPassword }
+        // Credentials are opaque: leading and trailing spaces can be part of a
+        // valid one, and the pasted-URL path preserves the decoded query value
+        // exactly. Trimming here would silently change the credential and make
+        // those accounts unable to authenticate, with nothing on screen to
+        // explain it. The trimmed copies decide emptiness and nothing else.
+        guard !rawUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CredentialFieldsError.missingUsername
+        }
+        guard !rawPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw CredentialFieldsError.missingPassword
+        }
 
-        return Account(host: host, username: username, password: password)
+        return Account(host: host, username: rawUsername, password: rawPassword)
     }
 
     /// Accepts `host`, `host:port`, and either form with a scheme already
