@@ -538,6 +538,17 @@
         }
       }
     },
+    "Hide the channel list": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar la lista de canales"
+          }
+        }
+      }
+    },
     "How your provider gave you the details": {
       "extractionState": "manual",
       "localizations": {
@@ -1154,6 +1165,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar URL de la lista"
+          }
+        }
+      }
+    },
+    "Show the channel list": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar la lista de canales"
           }
         }
       }

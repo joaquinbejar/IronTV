@@ -1,0 +1,78 @@
+import XCTest
+@testable import IronTV
+
+/// The channel-list toggle is view state, so what is testable here is the
+/// contract around it rather than the layout: that hiding the list is not the
+/// same thing as full screen, and that the video surface is told to rebuild.
+///
+/// The swap itself needs a running window server, so the visual result — no
+/// black frame on the VLC engine after the transition — belongs to the manual
+/// pass, the same as the full-screen swap it copies.
+final class ChannelListVisibilityTests: XCTestCase {
+
+    @MainActor
+    private func makeViewModel() -> PlayerViewModel {
+        PlayerViewModel(settingsStore: PlaybackSettingsStore(storage: UserDefaults(suiteName: "ChannelListTests.\(UUID())")!))
+    }
+
+    /// `videoSurfaceRecreated()` is what stops VLC rendering black into a
+    /// drawable that no longer exists. It must be safe to call when there is
+    /// nothing playing, because the user can hide the list before picking a
+    /// channel.
+    @MainActor
+    func testSurfaceRecreationIsSafeWithNoStream() {
+        let viewModel = makeViewModel()
+        XCTAssertNil(viewModel.currentStream)
+
+        viewModel.videoSurfaceRecreated()
+
+        XCTAssertEqual(viewModel.state, .idle)
+        XCTAssertNil(viewModel.currentStream)
+    }
+
+    /// The compact-iOS trap this guards, expressed at the level the view model
+    /// can see it: `stop()` is what the browser's cleanup would have called,
+    /// and it clears the session entirely. Hiding the list must never reach
+    /// it — the view keeps its `onDisappear` cleanup for real navigation away
+    /// and skips it while swapping hierarchies.
+    @MainActor
+    func testStoppingIsWhatHidingTheListMustNotDo() {
+        let viewModel = makeViewModel()
+        let stream = LiveStream(id: StreamID(9), name: "Ch", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
+        viewModel.primeForReconnectTesting(
+            stream: stream,
+            url: URL(string: "http://host.example.com/stream/9.m3u8")!,
+            tsURL: nil,
+            settings: .default,
+            state: .playing
+        )
+
+        viewModel.stop()
+
+        XCTAssertNil(viewModel.currentStream, "stop() ends the session — the outcome the guard exists to prevent")
+        XCTAssertEqual(viewModel.state, .idle)
+    }
+
+    /// Hiding the list keeps the toolbar, so it must not disturb playback the
+    /// way stopping would: the same stream is still current afterwards.
+    @MainActor
+    func testSurfaceRecreationKeepsTheCurrentStream() {
+        let viewModel = makeViewModel()
+        let stream = LiveStream(id: StreamID(3), name: "Ch", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
+        viewModel.primeForReconnectTesting(
+            stream: stream,
+            // Inert on purpose: scripts/secret-scan.sh flags the Xtream
+            // `/live/{user}/{pass}/` layout in tracked files unless the host
+            // is one of its allowlisted example domains, and this test needs
+            // a URL rather than a credential layout.
+            url: URL(string: "http://host.example.com/stream/3.m3u8")!,
+            tsURL: nil,
+            settings: .default,
+            state: .playing
+        )
+
+        viewModel.videoSurfaceRecreated()
+
+        XCTAssertEqual(viewModel.currentStream, stream)
+    }
+}
