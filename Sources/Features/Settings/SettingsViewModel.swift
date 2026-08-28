@@ -9,7 +9,7 @@ final class SettingsViewModel: ObservableObject {
         /// An http URL parsed, no TLS twin answered, and nothing has been sent
         /// over plaintext yet — waiting for the user's deliberate go-ahead.
         case confirmingInsecureTransport
-        case success(expiryDate: Date?)
+        case success(expiryDate: Date?, origin: Account.CatalogOrigin)
         case failure(String)
     }
 
@@ -17,7 +17,17 @@ final class SettingsViewModel: ObservableObject {
     /// known expiry (missing/zero/garbage `exp_date`, sanitized to `nil` in the
     /// DTO mapping), and the inconsistent case where authentication succeeded
     /// but the reported expiry is not in the future.
-    static func successMessage(expiryDate: Date?, now: Date = Date()) -> String {
+    static func successMessage(
+        expiryDate: Date?,
+        origin: Account.CatalogOrigin = .xtream,
+        now: Date = Date()
+    ) -> String {
+        // Announced, not silent. A playlist account has no expiry and no
+        // connection limit, and "why does mine not show that" is unanswerable
+        // if the app never says which way it connected.
+        if origin == .playlist {
+            return String(localized: "Connected by reading the playlist. Your provider has no panel to ask, so there is no expiry date or connection limit to show.")
+        }
         guard let expiryDate else { return String(localized: "Account valid (no expiry reported)") }
         let formatted = expiryDate.formatted(date: .abbreviated, time: .omitted)
         if expiryDate <= now {
@@ -111,7 +121,25 @@ final class SettingsViewModel: ObservableObject {
         func account() throws -> Account {
             switch self {
             case .pastedURL(let text):
-                return try M3UURLParser.parse(text)
+                do {
+                    return try M3UURLParser.parse(text)
+                } catch let error as M3UURLParseError {
+                    // Only the credential failures fall back. The URL is a
+                    // playlist we cannot read credentials out of — a different
+                    // parameter spelling, or a provider with no Xtream panel
+                    // at all — so the playlist itself becomes the catalog.
+                    // A string that is not a usable URL still fails, because
+                    // there is nothing to download either.
+                    switch error {
+                    case .notAURL, .unsupportedScheme:
+                        throw error
+                    case .missingUsername, .missingPassword:
+                        guard let account = PlaylistAccountBuilder.account(fromPlaylistURL: text) else {
+                            throw error
+                        }
+                        return account
+                    }
+                }
             case .fields(let host, let username, let password, let scheme):
                 return try CredentialFieldsParser.parse(host: host, username: username, password: password, scheme: scheme)
             }
@@ -124,6 +152,26 @@ final class SettingsViewModel: ObservableObject {
     /// the view so it is reset together with the credential it exposes — a reveal
     /// must never carry over to the next URL the user types or pastes.
     @Published private(set) var isRevealingURL = false
+
+    /// A playlist account has no panel to ask, so "are these credentials good"
+    /// becomes "does the playlist download". Both answer the same
+    /// ``AccountValidating`` question, which is what keeps the validation flow
+    /// below identical for the two origins.
+    @MainActor
+    static func defaultClient(for account: Account, timeout: TimeInterval) -> AccountValidating {
+        switch account.origin {
+        case .xtream:
+            return XtreamClient(account: account, requestTimeout: timeout)
+        case .playlist:
+            return M3UCatalogClient(
+                playlistURL: account.playlistURL ?? account.host,
+                panelHost: account.host,
+                // Validation must reflect the provider right now, never a
+                // cached answer from a previous attempt.
+                cacheLifetime: 0
+            )
+        }
+    }
 
     /// Builds the client that checks credentials against the panel. Injectable
     /// so tests can validate offline.
@@ -142,7 +190,7 @@ final class SettingsViewModel: ObservableObject {
     private static let httpsProbeTimeout: TimeInterval = 8
 
     init(
-        makeClient: @escaping ClientFactory = { XtreamClient(account: $0, requestTimeout: $1) },
+        makeClient: @escaping ClientFactory = { SettingsViewModel.defaultClient(for: $0, timeout: $1) },
         currentSettings: @escaping @MainActor () -> PlaybackSettings = { PlaybackSettingsStore().load() },
         migratePreferences: @escaping @MainActor (Account, Account) -> Void = { AccountPreferenceMigrator.migrate(from: $0, to: $1) }
     ) {
@@ -343,7 +391,7 @@ final class SettingsViewModel: ObservableObject {
             try appModel.saveAccount(resolved)
             // Phase first: it takes urlText out of the validating state, so
             // clearing the field below doesn't cancel this completion.
-            phase = .success(expiryDate: finalStatus.expiryDate)
+            phase = .success(expiryDate: finalStatus.expiryDate, origin: resolved.origin)
             clearCredentialInput()
         } catch is CancellationError {
             return
@@ -382,7 +430,24 @@ final class SettingsViewModel: ObservableObject {
         }
         components.scheme = "https"
         guard let host = components.url else { return nil }
-        return Account(host: host, username: account.username, password: account.password)
+        // A playlist account carries its own URL; upgrading only the host
+        // would probe TLS and then keep downloading over plaintext.
+        var playlistURL = account.playlistURL
+        if let existing = playlistURL {
+            guard var playlistComponents = URLComponents(url: existing, resolvingAgainstBaseURL: false) else {
+                return nil
+            }
+            playlistComponents.scheme = "https"
+            guard let upgraded = playlistComponents.url else { return nil }
+            playlistURL = upgraded
+        }
+        return Account(
+            host: host,
+            username: account.username,
+            password: account.password,
+            origin: account.origin,
+            playlistURL: playlistURL
+        )
     }
 
     /// Drops the credential-bearing text **and** re-hides it. Both belong together:

@@ -1,0 +1,4 @@
+# The CRLF playlist fixture exists precisely to prove the parser tolerates
+# CRLF line endings. Git normalising it to LF would make the test pass here
+# and fail on a fresh clone.
+Tests/Fixtures/playlist_crlf.m3u -text

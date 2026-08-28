@@ -1,6 +1,10 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%lld h": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
     "API request timeout": {
       "extractionState": "manual",
       "localizations": {
@@ -185,6 +189,17 @@
         }
       }
     },
+    "Catalog": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catálogo"
+          }
+        }
+      }
+    },
     "Categories": {
       "extractionState": "manual",
       "localizations": {
@@ -214,6 +229,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canales"
+          }
+        }
+      }
+    },
+    "Connected by reading the playlist. Your provider has no panel to ask, so there is no expiry date or connection limit to show.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectado leyendo la lista de reproducción. Tu proveedor no tiene panel al que preguntar, así que no hay fecha de caducidad ni límite de conexiones que mostrar."
           }
         }
       }
@@ -335,6 +361,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Introduce tu usuario."
+          }
+        }
+      }
+    },
+    "Every time": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cada vez"
           }
         }
       }
@@ -681,6 +718,17 @@
         }
       }
     },
+    "Only used by accounts whose catalog comes from a playlist file. Provider playlists can be tens of megabytes, so the downloaded copy is reused until it is this old. Zero downloads it every time. Refreshing the channel list by hand always downloads a fresh copy, whatever this says.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo lo usan las cuentas cuyo catálogo viene de un fichero de lista. Las listas de los proveedores pueden ocupar decenas de megabytes, así que la copia descargada se reutiliza hasta que tiene esta antigüedad. Cero la descarga cada vez. Actualizar la lista de canales a mano siempre descarga una copia nueva, diga lo que diga esto."
+          }
+        }
+      }
+    },
     "Open Settings…": {
       "extractionState": "manual",
       "localizations": {
@@ -802,6 +850,17 @@
         }
       }
     },
+    "Playlist": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lista de reproducción"
+          }
+        }
+      }
+    },
     "Playlist URL": {
       "extractionState": "manual",
       "localizations": {
@@ -809,6 +868,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "URL de la lista"
+          }
+        }
+      }
+    },
+    "Read from the playlist": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leído de la lista de reproducción"
           }
         }
       }
@@ -842,6 +912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reconectando…"
+          }
+        }
+      }
+    },
+    "Refresh playlist after": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar la lista tras"
           }
         }
       }
@@ -1099,6 +1180,17 @@
         }
       }
     },
+    "That address did not return a playlist.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esa dirección no devolvió una lista de reproducción."
+          }
+        }
+      }
+    },
     "That server address can't be read. Use the form host.example.com or host.example.com:8080.": {
       "extractionState": "manual",
       "localizations": {
@@ -1194,6 +1286,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "El panel envió una respuesta que esta app no pudo leer."
+          }
+        }
+      }
+    },
+    "The playlist downloaded but contains no channels.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La lista se descargó pero no contiene canales."
           }
         }
       }
@@ -1308,6 +1411,17 @@
         }
       }
     },
+    "Ungrouped": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin grupo"
+          }
+        }
+      }
+    },
     "Unmute": {
       "extractionState": "manual",
       "localizations": {
@@ -1315,6 +1429,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Activar sonido"
+          }
+        }
+      }
+    },
+    "Unnamed channel": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canal sin nombre"
           }
         }
       }

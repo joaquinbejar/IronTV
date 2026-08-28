@@ -169,7 +169,7 @@ final class SettingsViewModelTests: XCTestCase {
         viewModel.urlText = validURL
         await viewModel.validateAndSave(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: expiry))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: expiry, origin: .xtream))
         XCTAssertEqual(store.saved?.username, "user1")
         XCTAssertEqual(appModel.account?.username, "user1")
         // The URL carries the password — it must not survive the save.
@@ -219,13 +219,19 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertNil(store.saved)
     }
 
-    func testUnparseableURLReportsFailureWithoutEchoingTheInput() async {
+    /// Text that is not a URL at all is still a dead end: there is no panel to
+    /// ask and nothing to download either, so nothing is attempted and the
+    /// message does not echo what was typed.
+    func testTextThatIsNotAURLReportsFailureWithoutEchoingTheInput() async {
         let (viewModel, spy) = makeViewModel(result: .success(authenticated()))
 
-        viewModel.urlText = "http://host.example.com/get.php?username=user1"
+        viewModel.urlText = "definitely not a url"
         await viewModel.validateAndSave(into: AppModel(store: FakeAccountStore()))
 
-        XCTAssertEqual(viewModel.phase, .failure("The URL has no password parameter."))
+        guard case .failure(let message) = viewModel.phase else {
+            return XCTFail("expected a failure phase, got \(viewModel.phase)")
+        }
+        XCTAssertFalse(message.contains("definitely not a url"), "the input leaked into the error text: \(message)")
         XCTAssertEqual(spy.callCount, 0, "no request should be made for input that can't be parsed")
     }
 
@@ -245,7 +251,7 @@ final class SettingsViewModelTests: XCTestCase {
         viewModel.passwordText = "pass1"
         await viewModel.validateAndSave(into: AppModel(store: store))
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.absoluteString, "https://host.example.com:8080")
         XCTAssertEqual(store.saved?.username, "user1")
     }
@@ -302,6 +308,30 @@ final class SettingsViewModelTests: XCTestCase {
         viewModel.inputMode = .separateFields
 
         XCTAssertEqual(viewModel.urlText, "")
+    }
+
+    /// A URL whose credentials cannot be read is no longer a dead end: it is
+    /// treated as a playlist to download instead. This is the behaviour change
+    /// #62 exists for — the same input used to fail with "The URL has no
+    /// password parameter".
+    func testURLWithUnreadableCredentialsFallsBackToThePlaylist() async {
+        let store = FakeAccountStore()
+        let (viewModel, _) = makeViewModel(result: .success(authenticated()))
+
+        viewModel.urlText = "http://host.example.com/get.php?user=user1&pass=secret"
+        await viewModel.validateAndSave(into: AppModel(store: store))
+
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .playlist))
+        XCTAssertEqual(store.saved?.origin, .playlist)
+        XCTAssertEqual(store.saved?.username, "", "a playlist account has no username of its own")
+        // The TLS twin answered, so the account is saved over https — and the
+        // playlist URL is upgraded with it. Upgrading only the host would
+        // probe TLS and then keep downloading in the clear.
+        XCTAssertEqual(store.saved?.host.absoluteString, "https://host.example.com")
+        XCTAssertEqual(
+            store.saved?.playlistURL?.absoluteString,
+            "https://host.example.com/get.php?user=user1&pass=secret"
+        )
     }
 
     // MARK: - Cancellation, staleness, dismissal
@@ -394,7 +424,7 @@ final class SettingsViewModelTests: XCTestCase {
         await first.value
 
         XCTAssertEqual(store.saved?.username, "user2", "the newest submission must be the one that saves")
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
     }
 
     // MARK: - Removal
@@ -520,7 +550,7 @@ final class SettingsViewModelTests: XCTestCase {
         viewModel.urlText = validURL
         await viewModel.validateAndSave(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.scheme, "https")
         XCTAssertEqual(store.saved?.host.port, 8080, "the upgrade must keep the entered port")
         XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https"], "nothing may go over plain http")
@@ -554,7 +584,7 @@ final class SettingsViewModelTests: XCTestCase {
         await viewModel.validateAndSave(into: appModel)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.scheme, "http")
         XCTAssertEqual(spy.accounts.map { $0.host.scheme ?? "" }, ["https", "http"])
     }
@@ -703,7 +733,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.phase, .confirmingInsecureTransport)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: probedExpiry), "success must report the saved endpoint's own status")
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: probedExpiry, origin: .xtream), "success must report the saved endpoint's own status")
         XCTAssertEqual(store.saved?.host.scheme, "https")
         XCTAssertEqual(store.saved?.host.port, 8443, "the account must land on the advertised TLS port")
         XCTAssertEqual(spy.accounts.map(Self.origin(of:)), ["https:8080", "http:8080", "https:8443"])
@@ -723,7 +753,7 @@ final class SettingsViewModelTests: XCTestCase {
         await viewModel.validateAndSave(into: appModel)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil), "a dead advertised port must never block the save")
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream), "a dead advertised port must never block the save")
         XCTAssertEqual(store.saved?.host.scheme, "http")
         XCTAssertEqual(store.saved?.host.port, 8080)
     }
@@ -744,7 +774,7 @@ final class SettingsViewModelTests: XCTestCase {
         await viewModel.validateAndSave(into: appModel)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.scheme, "http")
     }
 
@@ -762,7 +792,7 @@ final class SettingsViewModelTests: XCTestCase {
         await viewModel.validateAndSave(into: appModel)
         await viewModel.confirmInsecureTransport(into: appModel)
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.scheme, "http")
         XCTAssertEqual(spy.accounts.map(Self.origin(of:)), ["https:8080", "http:8080"])
     }
@@ -825,7 +855,7 @@ final class SettingsViewModelTests: XCTestCase {
         viewModel.urlText = "https://host.example.com:8443/get.php?username=user1&password=pass1"
         await viewModel.validateAndSave(into: AppModel(store: store))
 
-        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil))
+        XCTAssertEqual(viewModel.phase, .success(expiryDate: nil, origin: .xtream))
         XCTAssertEqual(store.saved?.host.scheme, "https")
         XCTAssertEqual(spy.callCount, 1)
     }

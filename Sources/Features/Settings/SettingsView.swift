@@ -115,7 +115,18 @@ struct AccountSettingsTab: View {
             if let account = appModel.account {
                 Section {
                     LabeledContent("Server", value: account.host.absoluteString)
-                    LabeledContent("Username", value: account.username)
+                    if account.reportsPanelStatus {
+                        LabeledContent("Username", value: account.username)
+                    } else {
+                        // A playlist account has no username of its own — the
+                        // credentials live inside the playlist URL. Showing an
+                        // empty row would read as data the app lost.
+                        LabeledContent("Catalog") {
+                            Text("Read from the playlist")
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityIdentifier("settings.catalogOrigin")
+                    }
                     LabeledContent("Transport") {
                         // Deliberately scoped to the panel API: stream requests
                         // follow whatever URLs the panel serves and the media
@@ -294,8 +305,8 @@ struct AccountSettingsTab: View {
             // The alert carries the decision; the inline row just flags it.
             Label("Awaiting HTTP confirmation", systemImage: "lock.open")
                 .foregroundStyle(.orange)
-        case .success(let expiryDate):
-            Label(successText(expiryDate: expiryDate), systemImage: "checkmark.circle.fill")
+        case .success(let expiryDate, let origin):
+            Label(successText(expiryDate: expiryDate, origin: origin), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case .failure(let message):
             Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -303,8 +314,8 @@ struct AccountSettingsTab: View {
         }
     }
 
-    private func successText(expiryDate: Date?) -> String {
-        SettingsViewModel.successMessage(expiryDate: expiryDate)
+    private func successText(expiryDate: Date?, origin: Account.CatalogOrigin) -> String {
+        SettingsViewModel.successMessage(expiryDate: expiryDate, origin: origin)
     }
 }
 
@@ -357,6 +368,20 @@ struct PlaybackSettingsTab: View {
             }
 
             Section {
+                hoursStepper(
+                    String(localized: "Refresh playlist after"),
+                    value: $model.settings.playlistCacheHours,
+                    in: PlaybackSettings.playlistCacheHoursRange,
+                    step: 6
+                )
+            } header: {
+                Text("Playlist")
+            } footer: {
+                Text("Only used by accounts whose catalog comes from a playlist file. Provider playlists can be tens of megabytes, so the downloaded copy is reused until it is this old. Zero downloads it every time. Refreshing the channel list by hand always downloads a fresh copy, whatever this says.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Button("Restore Defaults") {
                     model.restoreDefaults()
                 }
@@ -374,6 +399,36 @@ struct PlaybackSettingsTab: View {
             // from a remote adoption is a no-op instead of nine stale writes.
             model.persist()
         }
+    }
+
+    /// Hours rather than seconds: the playlist cache is a "once a day" kind of
+    /// decision, and a seconds stepper would need thousands of presses.
+    @ViewBuilder
+    private func hoursStepper(
+        _ title: String,
+        value: Binding<TimeInterval>,
+        in range: ClosedRange<TimeInterval>,
+        step: TimeInterval
+    ) -> some View {
+        #if os(tvOS)
+        // Stepper doesn't exist on tvOS — focusable +/- buttons instead, the
+        // same shape secondsStepper uses.
+        AdjusterRow(title: title, valueText: Self.cacheHoursText(value.wrappedValue)) { delta in
+            let updated = value.wrappedValue + TimeInterval(delta) * step
+            value.wrappedValue = min(max(updated, range.lowerBound), range.upperBound)
+        }
+        #else
+        Stepper(value: value, in: range, step: step) {
+            LabeledContent(title, value: Self.cacheHoursText(value.wrappedValue))
+        }
+        .accessibilityIdentifier("settings.playlistCacheHours")
+        #endif
+    }
+
+    /// Zero is a real choice, not an empty value — say so rather than "0 h".
+    private static func cacheHoursText(_ hours: TimeInterval) -> String {
+        let whole = Int(hours)
+        return whole == 0 ? String(localized: "Every time") : String(localized: "\(whole) h")
     }
 
     private func secondsStepper(

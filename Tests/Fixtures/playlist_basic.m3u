@@ -1,0 +1,9 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="news.uk" tvg-logo="http://host.example.com/logos/news.png" group-title="News",UK News HD
+http://host.example.com/live/u/p/101.m3u8
+#EXTINF:-1 group-title="News",France 24, Live
+http://host.example.com/live/u/p/102.ts
+#EXTINF:-1 tvg-logo="http://host.example.com/logos/s.png" tvg-id="sports.1" group-title="Sports",Sports One
+http://host.example.com/live/u/p/103.m3u8
+#EXTINF:-1,Ungrouped Channel
+http://host.example.com/live/u/p/104.m3u8

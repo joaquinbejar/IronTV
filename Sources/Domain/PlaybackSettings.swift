@@ -34,6 +34,13 @@ public struct PlaybackSettings: Equatable, Sendable {
     public var apiTimeoutSeconds: TimeInterval
     /// Engine strategy for panel streams.
     public var preferredEngine: PlaybackEngineOption
+    /// How long a downloaded playlist stays usable before the next catalog
+    /// read re-fetches it. Only playlist-sourced accounts read this: an
+    /// Xtream catalog is fetched per category and needs no such policy.
+    /// Provider playlists reach tens of megabytes, so downloading on every
+    /// launch is not acceptable on cellular; an explicit refresh always
+    /// ignores this value.
+    public var playlistCacheHours: TimeInterval
 
     public init(
         forwardBufferSeconds: TimeInterval,
@@ -44,7 +51,8 @@ public struct PlaybackSettings: Equatable, Sendable {
         watchdogIntervalSeconds: TimeInterval,
         fastStart: Bool,
         apiTimeoutSeconds: TimeInterval,
-        preferredEngine: PlaybackEngineOption
+        preferredEngine: PlaybackEngineOption,
+        playlistCacheHours: TimeInterval = PlaybackSettings.defaultPlaylistCacheHours
     ) {
         self.forwardBufferSeconds = forwardBufferSeconds
         self.liveEdgeOffsetSeconds = liveEdgeOffsetSeconds
@@ -55,6 +63,7 @@ public struct PlaybackSettings: Equatable, Sendable {
         self.fastStart = fastStart
         self.apiTimeoutSeconds = apiTimeoutSeconds
         self.preferredEngine = preferredEngine
+        self.playlistCacheHours = playlistCacheHours
     }
 
     public static let `default` = PlaybackSettings(
@@ -66,8 +75,14 @@ public struct PlaybackSettings: Equatable, Sendable {
         watchdogIntervalSeconds: 2,
         fastStart: true,
         apiTimeoutSeconds: 30,
-        preferredEngine: .auto
+        preferredEngine: .auto,
+        playlistCacheHours: PlaybackSettings.defaultPlaylistCacheHours
     )
+
+    /// A day: long enough that opening the app is instant and cheap, short
+    /// enough that a provider's weekly channel changes appear without the
+    /// user having to know the refresh button exists.
+    public static let defaultPlaylistCacheHours: TimeInterval = 24
 
     // MARK: - Constraints
 
@@ -76,6 +91,9 @@ public struct PlaybackSettings: Equatable, Sendable {
     /// two can never drift apart, and no value outside them can reach a
     /// Timer, CMTime, URLRequest timeout, or retry calculation.
     public static let forwardBufferRange: ClosedRange<TimeInterval> = 5...120
+    /// Zero means "always re-fetch", which is a legitimate choice for someone
+    /// whose provider changes channels constantly.
+    public static let playlistCacheHoursRange: ClosedRange<TimeInterval> = 0...168
     public static let liveEdgeOffsetRange: ClosedRange<TimeInterval> = 0...60
     public static let waitingTimeoutRange: ClosedRange<TimeInterval> = 2...60
     public static let frozenTimeoutRange: ClosedRange<TimeInterval> = 2...60
@@ -101,7 +119,8 @@ public struct PlaybackSettings: Equatable, Sendable {
             watchdogIntervalSeconds: Self.normalize(watchdogIntervalSeconds, into: Self.watchdogIntervalRange, default: Self.default.watchdogIntervalSeconds),
             fastStart: fastStart,
             apiTimeoutSeconds: Self.normalize(apiTimeoutSeconds, into: Self.apiTimeoutRange, default: Self.default.apiTimeoutSeconds),
-            preferredEngine: preferredEngine
+            preferredEngine: preferredEngine,
+            playlistCacheHours: Self.normalize(playlistCacheHours, into: Self.playlistCacheHoursRange, default: Self.default.playlistCacheHours)
         )
     }
 
