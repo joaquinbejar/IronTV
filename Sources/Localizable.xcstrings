@@ -218,6 +218,17 @@
         }
       }
     },
+    "Connection": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexión"
+          }
+        }
+      }
+    },
     "Continue with HTTP": {
       "extractionState": "manual",
       "localizations": {
@@ -291,6 +302,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Motor"
+          }
+        }
+      }
+    },
+    "Enter the server address your provider gave you.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce la dirección del servidor que te dio tu proveedor."
+          }
+        }
+      }
+    },
+    "Enter your password.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce tu contraseña."
+          }
+        }
+      }
+    },
+    "Enter your username.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introduce tu usuario."
           }
         }
       }
@@ -394,6 +438,10 @@
         }
       }
     },
+    "HTTP": {
+      "extractionState": "manual",
+      "shouldTranslate": false
+    },
     "HTTP (unencrypted)": {
       "extractionState": "manual",
       "localizations": {
@@ -404,6 +452,10 @@
           }
         }
       }
+    },
+    "HTTPS": {
+      "extractionState": "manual",
+      "shouldTranslate": false
     },
     "HTTPS (panel API encrypted)": {
       "extractionState": "manual",
@@ -445,6 +497,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ocultar URL de la lista"
+          }
+        }
+      }
+    },
+    "How your provider gave you the details": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cómo te dio los datos tu proveedor"
           }
         }
       }
@@ -625,6 +688,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abrir Ajustes…"
+          }
+        }
+      }
+    },
+    "Password": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraseña"
           }
         }
       }
@@ -937,6 +1011,17 @@
         }
       }
     },
+    "Separate details": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datos por separado"
+          }
+        }
+      }
+    },
     "Server": {
       "extractionState": "manual",
       "localizations": {
@@ -944,6 +1029,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Servidor"
+          }
+        }
+      }
+    },
+    "Server address": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dirección del servidor"
           }
         }
       }
@@ -1003,6 +1099,17 @@
         }
       }
     },
+    "That server address can't be read. Use the form host.example.com or host.example.com:8080.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se puede leer esa dirección de servidor. Usa la forma host.example.com o host.example.com:8080."
+          }
+        }
+      }
+    },
     "The URL has no password parameter.": {
       "extractionState": "manual",
       "localizations": {
@@ -1021,6 +1128,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La URL no tiene el parámetro username."
+          }
+        }
+      }
+    },
+    "The address starts with %1$@:// but %2$@ is selected. Change one of the two so they agree.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La dirección empieza por %1$@:// pero está seleccionado %2$@. Cambia uno de los dos para que coincidan."
           }
         }
       }
@@ -1201,6 +1319,17 @@
         }
       }
     },
+    "Unsupported scheme “%@” — the address must use http or https.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquema “%@” no admitido: la dirección debe usar http o https."
+          }
+        }
+      }
+    },
     "Unsupported scheme “%@” — the playlist URL must start with http:// or https://.": {
       "extractionState": "manual",
       "localizations": {
@@ -1208,6 +1337,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esquema no compatible “%@”: la URL de la lista debe empezar por http:// o https://."
+          }
+        }
+      }
+    },
+    "Use this when your provider gave you the server, username and password separately. The address takes the form host.example.com or host.example.com:8080. Your password is hidden while you type and cleared once the account is saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Úsalo cuando tu proveedor te dio el servidor, el usuario y la contraseña por separado. La dirección tiene la forma host.example.com o host.example.com:8080. La contraseña se oculta mientras escribes y se borra al guardar la cuenta."
           }
         }
       }
@@ -1296,6 +1436,10 @@
           }
         }
       }
+    },
+    "host.example.com:8080": {
+      "extractionState": "manual",
+      "shouldTranslate": false
     },
     "http://host.example.com:8080/get.php?username=…&password=…": {
       "extractionState": "manual",

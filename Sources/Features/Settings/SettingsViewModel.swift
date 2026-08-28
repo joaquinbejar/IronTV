@@ -43,6 +43,81 @@ final class SettingsViewModel: ObservableObject {
             }
         }
     }
+    /// How the user is entering the account. Providers hand credentials out
+    /// both ways: some as one playlist URL, some as three separate values.
+    enum InputMode: String, CaseIterable, Equatable {
+        case pastedURL
+        case separateFields
+    }
+
+    @Published var inputMode: InputMode = .pastedURL {
+        didSet {
+            guard inputMode != oldValue else { return }
+            // Switching modes abandons whatever was in flight, and takes the
+            // credentials with it: a password typed in one mode must not
+            // survive into the other, where the user cannot see it any more.
+            cancelValidation()
+            clearCredentialInput()
+            phase = .idle
+        }
+    }
+
+    /// Host as typed: `host`, `host:port`, with or without a scheme.
+    @Published var hostText = "" { didSet { fieldEdited(hostText, oldValue) } }
+    @Published var usernameText = "" { didSet { fieldEdited(usernameText, oldValue) } }
+    @Published var passwordText = "" { didSet { fieldEdited(passwordText, oldValue) } }
+    /// Explicit, never inferred from `hostText` — see ``TransportScheme``.
+    @Published var scheme: TransportScheme = .https { didSet { fieldEdited(scheme.rawValue, oldValue.rawValue) } }
+
+    /// Same rule the pasted URL follows: an edit invalidates an in-flight
+    /// validation, so a completion cannot save an account that no longer
+    /// matches what is on screen.
+    private func fieldEdited(_ newValue: String, _ oldValue: String) {
+        guard newValue != oldValue else { return }
+        if phase == .validating {
+            cancelValidation()
+        } else if phase == .confirmingInsecureTransport {
+            cancelInsecureTransport()
+        }
+    }
+
+    /// What is on screen right now, whichever mode is active. Completions
+    /// compare against this to decide whether they are still relevant.
+    private var currentInput: CredentialInput {
+        switch inputMode {
+        case .pastedURL:
+            return .pastedURL(urlText)
+        case .separateFields:
+            return .fields(host: hostText, username: usernameText, password: passwordText, scheme: scheme)
+        }
+    }
+
+    /// A submission, identified by the exact text it came from. Equatable so
+    /// ``isStillCurrent(_:)`` can tell an edited form from an untouched one.
+    enum CredentialInput: Equatable {
+        case pastedURL(String)
+        case fields(host: String, username: String, password: String, scheme: TransportScheme)
+
+        var isEmpty: Bool {
+            switch self {
+            case .pastedURL(let text):
+                return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            case .fields(let host, let username, let password, _):
+                return [host, username, password]
+                    .allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            }
+        }
+
+        func account() throws -> Account {
+            switch self {
+            case .pastedURL(let text):
+                return try M3UURLParser.parse(text)
+            case .fields(let host, let username, let password, let scheme):
+                return try CredentialFieldsParser.parse(host: host, username: username, password: password, scheme: scheme)
+            }
+        }
+    }
+
     @Published private(set) var phase: Phase = .idle
 
     /// Whether the pasted URL is shown in the clear. It lives here rather than in
@@ -60,7 +135,7 @@ final class SettingsViewModel: ObservableObject {
     private var validationTask: Task<Void, Never>?
     /// The pasted URL an insecure-transport confirmation refers to. Consumed by
     /// ``confirmInsecureTransport(into:)``; dropped on cancel, edit or dismiss.
-    private var pendingInsecureSubmission: String?
+    private var pendingInsecureSubmission: CredentialInput?
 
     /// Cap on the HTTPS probe so a filtered TLS port cannot stall the
     /// insecure-transport warning behind the full API timeout.
@@ -77,17 +152,18 @@ final class SettingsViewModel: ObservableObject {
     }
 
     var canSubmit: Bool {
-        phase != .validating && !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        phase != .validating && !currentInput.isEmpty
     }
 
-    /// Parse the pasted M3U URL, check the credentials against the panel
-    /// (`player_api.php`, no action), and persist on success.
+    /// Turn whatever the active input mode holds into an `Account`, check the
+    /// credentials against the panel (`player_api.php`, no action), and persist
+    /// on success.
     ///
     /// Latest request wins: a previous in-flight validation is cancelled, and a
     /// completion that is no longer current cannot touch `phase` or save an
     /// account.
     func validateAndSave(into appModel: AppModel) async {
-        let submitted = urlText
+        let submitted = currentInput
         validationTask?.cancel()
         pendingInsecureSubmission = nil
         phase = .validating
@@ -104,7 +180,7 @@ final class SettingsViewModel: ObservableObject {
     /// warning. Re-runs validation over http; a stale confirmation (text edited,
     /// nothing pending) is a no-op.
     func confirmInsecureTransport(into appModel: AppModel) async {
-        guard let submitted = pendingInsecureSubmission, submitted == urlText else { return }
+        guard let submitted = pendingInsecureSubmission, submitted == currentInput else { return }
         pendingInsecureSubmission = nil
         validationTask?.cancel()
         phase = .validating
@@ -172,9 +248,9 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
-    private func performValidation(of submitted: String, into appModel: AppModel, insecureTransportConfirmed: Bool) async {
+    private func performValidation(of submitted: CredentialInput, into appModel: AppModel, insecureTransportConfirmed: Bool) async {
         do {
-            let account = try M3UURLParser.parse(submitted)
+            let account = try submitted.account()
             let timeout = currentSettings().apiTimeoutSeconds
 
             var resolved = account
@@ -313,13 +389,16 @@ final class SettingsViewModel: ObservableObject {
     /// leaving the reveal on would show the next URL the user types in the clear.
     private func clearCredentialInput() {
         urlText = ""
+        hostText = ""
+        usernameText = ""
+        passwordText = ""
         isRevealingURL = false
     }
 
     /// A completion may only report back if it wasn't cancelled and the text it
     /// validated is still the text on screen.
-    private func isStillCurrent(_ submitted: String) -> Bool {
-        !Task.isCancelled && submitted == urlText
+    private func isStillCurrent(_ submitted: CredentialInput) -> Bool {
+        !Task.isCancelled && submitted == currentInput
     }
 
     /// Panel and parse errors describe the failure without echoing the URL, so
