@@ -1,0 +1,12 @@
+#EXTM3U
+#EXTGRP:News
+#EXTINF:-1,Bare Entry
+http://host.example.com/live/u/p/301.m3u8
+
+#EXTVLCOPT:network-caching=1000
+#EXTINF:-1 unknown-attr="x" tvg-id="" group-title="",Empty Attributes
+http://host.example.com/live/u/p/302.m3u8
+#EXTINF:-1 group-title="Docs",Broken URL Entry
+not a url at all
+#EXTINF:-1 tvg-name="From TVG Name" group-title="Docs",
+http://host.example.com/live/u/p/303.m3u8

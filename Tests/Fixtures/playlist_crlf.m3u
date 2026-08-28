@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 group-title="News",CRLF Channel
+http://host.example.com/live/u/p/201.m3u8

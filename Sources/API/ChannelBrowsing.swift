@@ -9,6 +9,15 @@ public protocol ChannelBrowsing: Sendable {
     func liveCategories() async throws -> [Category]
     func liveStreams(in categoryID: CategoryID?) async throws -> [LiveStream]
     func playbackURL(for streamID: StreamID, format: XtreamClient.StreamFormat) throws -> URL
+    /// Drop whatever this source cached, so the next read goes to the network.
+    /// The Xtream client holds nothing between calls, so its implementation is
+    /// the default no-op; a playlist source keeps a whole downloaded catalog
+    /// and has to honour the user's explicit refresh.
+    func invalidateCachedCatalog() async
+}
+
+public extension ChannelBrowsing {
+    func invalidateCachedCatalog() async {}
 }
 
 extension XtreamClient: ChannelBrowsing {}

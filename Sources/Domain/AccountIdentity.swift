@@ -27,22 +27,39 @@ public struct AccountIdentity: Hashable, Sendable, CustomStringConvertible {
     public let fingerprint: String
 
     public init(host: URL, username: String, password: String) {
-        self.namespace = "\(host.absoluteString).\(username)"
-        self.storageNamespace = "v1." + Self.digest("\(host.absoluteString)\u{0}\(username)")
-        self.fingerprint = Self.fingerprint(host: host, username: username, password: password)
+        self.init(host: host, username: username, password: password, playlistURL: nil)
+    }
+
+    /// `playlistURL` distinguishes playlist-backed accounts. They carry an
+    /// empty username and a host reduced to the authority, so two playlists on
+    /// the same server — `/a.m3u` and `/b.m3u` — would otherwise be the same
+    /// account: the browser would keep the previous catalog on switching, and
+    /// their favorites and last channel would share a namespace.
+    ///
+    /// It reaches the namespaces only as an irreversible digest. The URL
+    /// carries the provider's credentials, so it must never appear in a
+    /// preference key, a log, or `description`. Passing nil reproduces the
+    /// previous derivation byte for byte, which is what keeps every Xtream
+    /// account's existing favorites and last channel attached to it.
+    public init(host: URL, username: String, password: String, playlistURL: URL?) {
+        let discriminator = playlistURL.map { "\u{0}" + Self.digest($0.absoluteString) } ?? ""
+        self.namespace = "\(host.absoluteString).\(username)\(playlistURL == nil ? "" : "#playlist")"
+        self.storageNamespace = "v1." + Self.digest("\(host.absoluteString)\u{0}\(username)\(discriminator)")
+        self.fingerprint = Self.digest("\(host.absoluteString)\u{0}\(username)\u{0}\(password)\(discriminator)")
     }
 
     public init(account: Account) {
-        self.init(host: account.host, username: account.username, password: account.password)
+        self.init(
+            host: account.host,
+            username: account.username,
+            password: account.password,
+            playlistURL: account.playlistURL
+        )
     }
 
     /// 64 bits of SHA-256 — plenty to tell credential sets apart, short enough
-    /// to read in a log line.
-    private static func fingerprint(host: URL, username: String, password: String) -> String {
-        // NUL-separated so ("ab", "c") and ("a", "bc") can't hash alike.
-        digest("\(host.absoluteString)\u{0}\(username)\u{0}\(password)")
-    }
-
+    /// to read in a log line. Material is NUL-separated so ("ab", "c") and
+    /// ("a", "bc") cannot hash alike.
     private static func digest(_ material: String) -> String {
         SHA256.hash(data: Data(material.utf8))
             .prefix(8).map { String(format: "%02x", $0) }.joined()

@@ -114,7 +114,7 @@ final class ChannelsViewModel: ObservableObject {
     ) {
         self.searchDebounce = searchDebounce
         let settings = PlaybackSettingsStore().load()
-        self.client = client ?? XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
+        self.client = client ?? Self.defaultClient(for: account, settings: settings)
         self.panelHost = account.host
         self.lastChannel = lastChannel ?? LastChannelStore(identity: account.identity, storage: preferenceStorage)
         self.favoritesStore = FavoritesStore(account: account, storage: preferenceStorage)
@@ -295,9 +295,18 @@ final class ChannelsViewModel: ObservableObject {
             return PlaybackPlan(primaryURL: ts, tsURL: ts, hlsAvailable: false)
         }
         if let direct = selection.directURL {
-            // Trusted same-host direct URL: container unknown, so AVPlayer
-            // leads and the usual codec fallback applies.
-            return PlaybackPlan(primaryURL: direct, tsURL: nil, hlsAvailable: true)
+            // Trusted same-host direct URL. The extension is the only
+            // container hint there is, and for a playlist-sourced catalog it
+            // is a good one: a `.ts` entry must lead with VLC rather than take
+            // a doomed AVPlayer attempt first, the same rule a TS-only panel
+            // gets. Anything else stays AVPlayer-first with the usual codec
+            // fallback behind it.
+            let isTransportStream = direct.pathExtension.lowercased() == "ts"
+            return PlaybackPlan(
+                primaryURL: direct,
+                tsURL: isTransportStream ? direct : nil,
+                hlsAvailable: !isTransportStream
+            )
         }
         throw PlaybackError.noPlayableSource
     }
@@ -306,6 +315,27 @@ final class ChannelsViewModel: ObservableObject {
     func playbackTSURL(for streamID: StreamID) -> URL? {
         guard !isDemo else { return nil }
         return try? client.playbackURL(for: streamID, format: .ts)
+    }
+
+    /// Xtream accounts talk to `player_api.php`; playlist accounts read the
+    /// playlist file. Both answer the same ``ChannelBrowsing`` questions, so
+    /// nothing below this line knows which one it got.
+    private static func defaultClient(for account: Account, settings: PlaybackSettings) -> ChannelBrowsing {
+        switch account.origin {
+        case .xtream:
+            return XtreamClient(account: account, requestTimeout: settings.apiTimeoutSeconds)
+        case .playlist:
+            return M3UCatalogClient(
+                playlistURL: account.playlistURL ?? account.host,
+                panelHost: account.host,
+                cacheLifetime: settings.playlistCacheHours * 3600,
+                // Persisted per account, so the expiry the user set survives
+                // relaunches. The namespace is a digest — the file name
+                // carries no host, username or playlist URL.
+                diskCache: PlaylistCacheStore(),
+                cacheNamespace: account.identity.storageNamespace
+            )
+        }
     }
 
     /// Public entry points cancel the superseded load, retain the new task,
@@ -324,6 +354,13 @@ final class ChannelsViewModel: ObservableObject {
     }
 
     func loadStreams(bypassCache: Bool = false) async {
+        if bypassCache {
+            // The view model's own caches are not the only ones: a playlist
+            // source holds the whole downloaded catalog, and an explicit
+            // refresh has to reach past its expiry or the user is shown the
+            // stale list they just asked to replace.
+            await client.invalidateCachedCatalog()
+        }
         let task = restartStreamsLoad(bypassCache: bypassCache)
         await task.value
     }
