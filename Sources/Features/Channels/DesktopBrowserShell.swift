@@ -101,6 +101,12 @@ struct DesktopBrowserShell: View {
                     isChannelListHidden: false
                 )
                 .onDisappear {
+                    // Compact iOS treats leaving the player as "done with this
+                    // channel". Hiding the list also removes this view, but it
+                    // is a swap to another player rather than navigation away
+                    // — without this guard an iPhone user hiding the list
+                    // would land on a stopped player with no channel selected.
+                    guard !isListHidden else { return }
                     if horizontalSizeClass == .compact {
                         player.stop()
                         channels.selectedStreamID = nil

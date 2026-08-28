@@ -30,6 +30,29 @@ final class ChannelListVisibilityTests: XCTestCase {
         XCTAssertNil(viewModel.currentStream)
     }
 
+    /// The compact-iOS trap this guards, expressed at the level the view model
+    /// can see it: `stop()` is what the browser's cleanup would have called,
+    /// and it clears the session entirely. Hiding the list must never reach
+    /// it — the view keeps its `onDisappear` cleanup for real navigation away
+    /// and skips it while swapping hierarchies.
+    @MainActor
+    func testStoppingIsWhatHidingTheListMustNotDo() {
+        let viewModel = makeViewModel()
+        let stream = LiveStream(id: StreamID(9), name: "Ch", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
+        viewModel.primeForReconnectTesting(
+            stream: stream,
+            url: URL(string: "http://host.example.com/stream/9.m3u8")!,
+            tsURL: nil,
+            settings: .default,
+            state: .playing
+        )
+
+        viewModel.stop()
+
+        XCTAssertNil(viewModel.currentStream, "stop() ends the session — the outcome the guard exists to prevent")
+        XCTAssertEqual(viewModel.state, .idle)
+    }
+
     /// Hiding the list keeps the toolbar, so it must not disturb playback the
     /// way stopping would: the same stream is still current afterwards.
     @MainActor
