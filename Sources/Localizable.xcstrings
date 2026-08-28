@@ -538,6 +538,17 @@
         }
       }
     },
+    "Hide the channel list": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar la lista de canales"
+          }
+        }
+      }
+    },
     "How your provider gave you the details": {
       "extractionState": "manual",
       "localizations": {
@@ -758,6 +769,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pega la URL de la lista M3U de tu proveedor. Si IronTV puede leer las credenciales de ella, habla con el panel de tu proveedor y no descarga la lista. Si no puede, recurre a descargar la lista y construir con ella el listado de canales. La URL contiene tu contraseña, así que se oculta mientras escribes y se borra al guardar la cuenta."
+          }
+        }
+      }
+    },
+    "Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pega la URL de la lista M3U de tu proveedor. IronTV solo extrae de ella el servidor y las credenciales; la lista en sí nunca se descarga. La URL contiene tu contraseña, por eso se oculta mientras escribes y se borra al guardar la cuenta."
           }
         }
       }
@@ -1154,6 +1176,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar URL de la lista"
+          }
+        }
+      }
+    },
+    "Show the channel list": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar la lista de canales"
           }
         }
       }

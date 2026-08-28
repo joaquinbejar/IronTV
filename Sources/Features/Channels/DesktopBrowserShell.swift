@@ -15,6 +15,10 @@ struct DesktopBrowserShell: View {
     #endif
 
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    /// Bigger picture without giving up the toolbar. Deliberately NOT
+    /// persisted: an app that opens with no channel list and no explanation
+    /// reads as broken, and restoring it is one click.
+    @State private var isListHidden = false
     #if !os(macOS)
     @State private var showingSettings = false
     #endif
@@ -33,11 +37,22 @@ struct DesktopBrowserShell: View {
                 // no-op.
                 player.videoSurfaceRecreated()
             }
+            .onChange(of: isListHidden) { _, _ in
+                // Same swap, same reason: hiding the list replaces the split
+                // view with a bare player, so VLC's drawable goes with it.
+                player.videoSurfaceRecreated()
+            }
     }
 
     @ViewBuilder
     private var content: some View {
-        if isFullScreen {
+        if isListHidden, !isFullScreen {
+            // Replacing the hierarchy rather than collapsing a column. macOS
+            // cannot collapse a NavigationSplitView's content column, which is
+            // why full screen swaps too — but this keeps `hidesChrome` false,
+            // so the toolbar, the engine chip and the way back all stay.
+            playerPane(onToggleChannelList: { isListHidden = false })
+        } else if isFullScreen {
             PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen, hidesChrome: true)
                 .windowToolbarHidden(true)
                 #if os(iOS)
@@ -79,13 +94,18 @@ struct DesktopBrowserShell: View {
                 channelColumn
                     .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             } detail: {
-                PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
-                    .onDisappear {
-                        if horizontalSizeClass == .compact {
-                            player.stop()
-                            channels.selectedStreamID = nil
-                        }
+                PlayerView(
+                    viewModel: player,
+                    onWillToggleFullScreen: playerWillToggleFullScreen,
+                    onToggleChannelList: { isListHidden = true },
+                    isChannelListHidden: false
+                )
+                .onDisappear {
+                    if horizontalSizeClass == .compact {
+                        player.stop()
+                        channels.selectedStreamID = nil
                     }
+                }
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -111,18 +131,32 @@ struct DesktopBrowserShell: View {
                 channelColumn
                     .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             } detail: {
-                #if os(macOS)
-                PlayerView(
-                    viewModel: player,
-                    onWillToggleFullScreen: playerWillToggleFullScreen,
-                    onToggleFloating: { floatingManager.toggle(with: player) }
-                )
-                #else
-                PlayerView(viewModel: player, onWillToggleFullScreen: playerWillToggleFullScreen)
-                #endif
+                playerPane(onToggleChannelList: { isListHidden = true })
             }
             #endif
         }
+    }
+
+    /// The player with full chrome, wired the same way whether it sits in the
+    /// split view's detail column or has replaced the whole hierarchy.
+    @ViewBuilder
+    private func playerPane(onToggleChannelList: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        PlayerView(
+            viewModel: player,
+            onWillToggleFullScreen: playerWillToggleFullScreen,
+            onToggleFloating: { floatingManager.toggle(with: player) },
+            onToggleChannelList: onToggleChannelList,
+            isChannelListHidden: isListHidden
+        )
+        #else
+        PlayerView(
+            viewModel: player,
+            onWillToggleFullScreen: playerWillToggleFullScreen,
+            onToggleChannelList: onToggleChannelList,
+            isChannelListHidden: isListHidden
+        )
+        #endif
     }
 
     private func playerWillToggleFullScreen() {

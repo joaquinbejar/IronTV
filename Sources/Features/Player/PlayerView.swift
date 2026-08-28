@@ -12,6 +12,12 @@ struct PlayerView: View {
     /// macOS floating mini-player toggle; the toolbar button only appears
     /// when this is provided.
     var onToggleFloating: (() -> Void)? = nil
+    /// Hides or restores the browser's channel list. Supplied by the browser
+    /// shell, which owns that state; the button only appears when it is.
+    var onToggleChannelList: (() -> Void)? = nil
+    /// Whether the list is currently hidden, so the button can say what it
+    /// will do rather than what it did.
+    var isChannelListHidden: Bool = false
     /// Full-screen mode: no navigation title, no toolbar, edge-to-edge video.
     var hidesChrome: Bool = false
 
@@ -89,6 +95,20 @@ struct PlayerView: View {
                         .accessibilityLabel("Resync with the live stream")
                         .accessibilityIdentifier("player.resyncButton")
                         .disabled(viewModel.currentStream == nil)
+                    }
+                    if let onToggleChannelList {
+                        ToolbarItem {
+                            Button(action: onToggleChannelList) {
+                                Image(systemName: isChannelListHidden
+                                    ? "sidebar.leading"
+                                    : "rectangle.trailinghalf.inset.filled")
+                            }
+                            .help(isChannelListHidden ? "Show the channel list" : "Hide the channel list")
+                            .accessibilityLabel(isChannelListHidden
+                                ? Text("Show the channel list")
+                                : Text("Hide the channel list"))
+                            .accessibilityIdentifier("browser.toggleChannelListButton")
+                        }
                     }
                     #if os(macOS)
                     if let onToggleFloating {
