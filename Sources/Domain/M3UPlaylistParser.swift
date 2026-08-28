@@ -25,6 +25,8 @@ public enum M3UPlaylistError: Error, Equatable, LocalizedError {
     case notAPlaylist
     /// A playlist that parsed but contained nothing playable.
     case empty
+    /// The response ended mid-entry: a channel line with no URL after it.
+    case truncated
 
     public var errorDescription: String? {
         switch self {
@@ -32,6 +34,8 @@ public enum M3UPlaylistError: Error, Equatable, LocalizedError {
             return String(localized: "That address did not return a playlist.")
         case .empty:
             return String(localized: "The playlist downloaded but contains no channels.")
+        case .truncated:
+            return String(localized: "The playlist download ended early — only part of the channel list arrived.")
         }
     }
 }
@@ -96,6 +100,11 @@ public struct M3UPlaylistParser {
     /// a truncated download must not look like a provider with few channels.
     public func finish() throws -> [M3UEntry] {
         guard sawHeader || !entries.isEmpty else { throw M3UPlaylistError.notAPlaylist }
+        // A trailing #EXTINF whose URL line never arrived means the response
+        // was cut short. Checked even when earlier entries parsed: otherwise a
+        // download that died a third of the way through is served as a
+        // complete, and much smaller, catalog.
+        guard pending == nil else { throw M3UPlaylistError.truncated }
         guard !entries.isEmpty else { throw M3UPlaylistError.empty }
         return entries
     }

@@ -92,3 +92,101 @@ final class M3UCatalogClientTests: XCTestCase {
         XCTAssertNotEqual(built.streams[0].id, built.streams[1].id)
     }
 }
+
+/// The cache policy the Settings expiry advertises. These drive the client
+/// through a stubbed session so no network is involved.
+final class M3UCatalogClientCacheTests: XCTestCase {
+
+    /// Serves a fixed playlist body and counts how often it was asked for.
+    private final class CountingProtocol: URLProtocol, @unchecked Sendable {
+        nonisolated(unsafe) static var body = """
+        #EXTM3U
+        #EXTINF:-1 group-title="News",A
+        http://host.example.com/stream/1.m3u8
+        """
+        nonisolated(unsafe) static var requestCount = 0
+        private static let lock = NSLock()
+
+        static func reset() { lock.withLock { requestCount = 0 } }
+        static var count: Int { lock.withLock { requestCount } }
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            Self.lock.withLock { Self.requestCount += 1 }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+    }
+
+    private func makeClient(cacheLifetime: TimeInterval, now: @escaping @Sendable () -> Date) -> M3UCatalogClient {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CountingProtocol.self]
+        return M3UCatalogClient(
+            playlistURL: URL(string: "http://host.example.com/playlist.m3u")!,
+            panelHost: URL(string: "http://host.example.com")!,
+            cacheLifetime: cacheLifetime,
+            session: URLSession(configuration: configuration),
+            now: now
+        )
+    }
+
+    override func setUp() {
+        super.setUp()
+        CountingProtocol.reset()
+    }
+
+    func testAFreshCacheIsReusedInsteadOfDownloadingAgain() async throws {
+        let client = makeClient(cacheLifetime: 3600, now: { Date(timeIntervalSince1970: 0) })
+
+        _ = try await client.liveCategories()
+        _ = try await client.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 1, "the second read must come from the cache")
+    }
+
+    func testAStaleCacheIsRefetched() async throws {
+        let clock = Clock()
+        let client = makeClient(cacheLifetime: 60, now: { clock.now })
+
+        _ = try await client.liveCategories()
+        clock.advance(by: 61)
+        _ = try await client.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 2)
+    }
+
+    /// The user's explicit refresh must reach past the expiry — otherwise it
+    /// shows the very list they asked to replace.
+    func testAnExplicitRefreshAlwaysRefetches() async throws {
+        let client = makeClient(cacheLifetime: 3600, now: { Date(timeIntervalSince1970: 0) })
+
+        _ = try await client.liveCategories()
+        await client.invalidateCachedCatalog()
+        _ = try await client.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 2)
+    }
+
+    /// A lifetime of zero is the documented "download every time" choice.
+    func testZeroLifetimeDownloadsEveryTime() async throws {
+        let client = makeClient(cacheLifetime: 0, now: { Date(timeIntervalSince1970: 0) })
+
+        _ = try await client.liveCategories()
+        _ = try await client.liveCategories()
+
+        XCTAssertEqual(CountingProtocol.count, 2)
+    }
+
+    private final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var date = Date(timeIntervalSince1970: 1_000_000)
+        var now: Date { lock.withLock { date } }
+        func advance(by seconds: TimeInterval) { lock.withLock { date += seconds } }
+    }
+}

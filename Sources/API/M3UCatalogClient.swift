@@ -59,6 +59,10 @@ public final class M3UCatalogClient: @unchecked Sendable {
 
     /// Drops the cached playlist so the next read re-fetches. The explicit
     /// refresh the user asks for must never be answered from cache.
+    public func invalidateCachedCatalog() async {
+        invalidateCache()
+    }
+
     public func invalidateCache() {
         lock.withLock {
             cached = nil

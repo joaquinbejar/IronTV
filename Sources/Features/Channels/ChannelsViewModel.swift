@@ -349,6 +349,13 @@ final class ChannelsViewModel: ObservableObject {
     }
 
     func loadStreams(bypassCache: Bool = false) async {
+        if bypassCache {
+            // The view model's own caches are not the only ones: a playlist
+            // source holds the whole downloaded catalog, and an explicit
+            // refresh has to reach past its expiry or the user is shown the
+            // stale list they just asked to replace.
+            await client.invalidateCachedCatalog()
+        }
         let task = restartStreamsLoad(bypassCache: bypassCache)
         await task.value
     }

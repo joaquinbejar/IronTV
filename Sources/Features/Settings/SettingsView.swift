@@ -104,7 +104,7 @@ struct AccountSettingsTab: View {
                 // no sense next to three hand-typed fields.
                 switch viewModel.inputMode {
                 case .pastedURL:
-                    Text("Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.")
+                    Text("Paste the M3U playlist URL from your provider. If IronTV can read the credentials out of it, it talks to your provider's panel and never downloads the playlist. If it cannot, it falls back to downloading the playlist and building the channel list from it. The URL contains your password, so it is hidden while you type and cleared once the account is saved.")
                         .foregroundStyle(.secondary)
                 case .separateFields:
                     Text("Use this when your provider gave you the server, username and password separately. The address takes the form host.example.com or host.example.com:8080. Your password is hidden while you type and cleared once the account is saved.")

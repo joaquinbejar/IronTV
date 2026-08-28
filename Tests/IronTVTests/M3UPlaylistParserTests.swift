@@ -88,7 +88,16 @@ final class M3UPlaylistParserTests: XCTestCase {
     /// A truncated download must not look like a provider with few channels.
     func testTruncatedPlaylistWithNoCompleteEntryThrows() throws {
         XCTAssertThrowsError(try entries("playlist_truncated")) { error in
-            XCTAssertEqual(error as? M3UPlaylistError, .empty)
+            XCTAssertEqual(error as? M3UPlaylistError, .truncated)
+        }
+    }
+
+    /// The dangerous truncation: a download that died a third of the way in
+    /// still has valid entries, so without this it is served as a complete
+    /// catalog that is simply smaller than the provider's.
+    func testTruncationAfterValidEntriesIsStillRejected() throws {
+        XCTAssertThrowsError(try entries("playlist_truncated_after_entries")) { error in
+            XCTAssertEqual(error as? M3UPlaylistError, .truncated)
         }
     }
 
