@@ -38,7 +38,11 @@ final class ChannelListVisibilityTests: XCTestCase {
         let stream = LiveStream(id: StreamID(3), name: "Ch", iconURL: nil, categoryID: CategoryID(1), epgChannelID: nil)
         viewModel.primeForReconnectTesting(
             stream: stream,
-            url: URL(string: "http://example.test/live/u/p/3.m3u8")!,
+            // Inert on purpose: scripts/secret-scan.sh flags the Xtream
+            // `/live/{user}/{pass}/` layout in tracked files unless the host
+            // is one of its allowlisted example domains, and this test needs
+            // a URL rather than a credential layout.
+            url: URL(string: "http://host.example.com/stream/3.m3u8")!,
             tsURL: nil,
             settings: .default,
             state: .playing
