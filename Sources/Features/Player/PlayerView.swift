@@ -58,6 +58,29 @@ struct PlayerView: View {
                     }
                     ToolbarItem {
                         Button {
+                            viewModel.toggleMute()
+                        } label: {
+                            // Glyph, not colour: the state has to be readable
+                            // without relying on hue.
+                            Image(systemName: viewModel.isMuted
+                                ? "speaker.slash.fill"
+                                : "speaker.wave.2.fill")
+                        }
+                        .help(viewModel.isMuted ? "Unmute" : "Mute")
+                        // Text-based so Spanish VoiceOver gets the catalog
+                        // translation, and state-announcing so the label says
+                        // what the button will do.
+                        .accessibilityLabel(viewModel.isMuted ? Text("Unmute") : Text("Mute"))
+                        .accessibilityIdentifier("player.muteButton")
+                        .disabled(viewModel.currentStream == nil)
+                        #if os(macOS)
+                        // Shift too: plain Cmd-M is AppKit's Minimize, and
+                        // taking it would cost the window its standard verb.
+                        .keyboardShortcut("m", modifiers: [.command, .shift])
+                        #endif
+                    }
+                    ToolbarItem {
+                        Button {
                             viewModel.resyncToLive()
                         } label: {
                             Image(systemName: "arrow.triangle.2.circlepath")

@@ -34,6 +34,32 @@ final class PlayerViewModel: ObservableObject {
     }
 
     @Published private(set) var engine: Engine = .avPlayer
+
+    /// Silences whichever engine is playing. Deliberately NOT persisted: an
+    /// app that starts silent with no visible cause reads as broken, and the
+    /// toggle costs one click. Kept here rather than on the surfaces because
+    /// both engines are swapped underneath the view (``replacePlayer()``,
+    /// ``startVLCPlayback(_:url:as:)``) and the setting has to outlive them.
+    @Published private(set) var isMuted = false
+
+    func toggleMute() {
+        setMuted(!isMuted)
+    }
+
+    func setMuted(_ muted: Bool) {
+        isMuted = muted
+        applyMute()
+    }
+
+    /// Re-applied after every engine swap: a fresh `AVPlayer` starts unmuted,
+    /// and a fresh `VLCMediaPlayer` has its own audio controller.
+    private func applyMute() {
+        player.isMuted = isMuted
+        #if canImport(VLCKitSPM)
+        vlcPlayer?.audio?.isMuted = isMuted
+        #endif
+    }
+
     /// Streams whose codecs AVPlayer already rejected this session — zap
     /// straight to VLC next time.
     private var vlcOnlyStreams: Set<StreamID> = []
@@ -149,6 +175,7 @@ final class PlayerViewModel: ObservableObject {
         }
         player = AVPlayer()
         configureTimeControlObservation()
+        applyMute()
     }
 
     /// Recreated on every (re)connection: synchronous calls on a wedged
@@ -717,6 +744,7 @@ final class PlayerViewModel: ObservableObject {
         player.media = media
         player.delegate = vlcProxy
         vlcPlayer = player
+        applyMute()
         player.play()
     }
 
