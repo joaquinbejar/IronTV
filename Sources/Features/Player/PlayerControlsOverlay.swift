@@ -57,7 +57,10 @@ struct PlayerControlsOverlay: View {
         .help(isPaused ? "Resume" : "Pause")
         .accessibilityLabel(isPaused ? Text("Resume") : Text("Pause"))
         .accessibilityIdentifier("player.playPauseButton")
-        .disabled(viewModel.currentStream == nil)
+        // Not merely "is there a stream": loading, reconnecting and failed
+        // render as neither playing nor paused, so a tap there would change
+        // hidden state without changing the glyph.
+        .disabled(!viewModel.canTogglePlayPause)
     }
 
     /// Pausing a live stream drifts it off the live edge; this is the way back.

@@ -238,8 +238,11 @@ struct PlayerView: View {
         // and it has to work whether or not the bar is currently on screen.
         .onPlayPauseCommand {
             guard wantsVLCControls else { return }
-            viewModel.togglePlayPause()
+            // Reveal regardless — showing the user why nothing happened beats
+            // a remote press that appears to do nothing at all.
             revealVLCControls()
+            guard viewModel.canTogglePlayPause else { return }
+            viewModel.togglePlayPause()
         }
         .onMoveCommand { _ in revealVLCControls() }
         #endif

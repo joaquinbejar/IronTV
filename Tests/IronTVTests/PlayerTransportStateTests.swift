@@ -44,6 +44,23 @@ final class PlayerTransportStateTests: XCTestCase {
         XCTAssertEqual(transport(.buffering, paused: true), .paused)
     }
 
+    // MARK: - Actionability
+
+    /// The glyph is derived from the transport state, so a toggle in a state
+    /// that renders as neither playing nor paused would flip hidden state
+    /// without changing the icon — and would reach pause() on a player that is
+    /// still opening or recovering.
+    func testPlayPauseIsOnlyActionableWhereTheGlyphReflectsIt() {
+        XCTAssertTrue(PlayerViewModel.canTogglePlayPause(.playing))
+        XCTAssertTrue(PlayerViewModel.canTogglePlayPause(.paused))
+        XCTAssertTrue(PlayerViewModel.canTogglePlayPause(.buffering))
+
+        XCTAssertFalse(PlayerViewModel.canTogglePlayPause(.unavailable))
+        XCTAssertFalse(PlayerViewModel.canTogglePlayPause(.loading))
+        XCTAssertFalse(PlayerViewModel.canTogglePlayPause(.reconnecting))
+        XCTAssertFalse(PlayerViewModel.canTogglePlayPause(.failed))
+    }
+
     /// A pause must not disguise a session that is in trouble — the user needs
     /// to see reconnecting and failed even if they had paused first.
     func testPauseDoesNotMaskReconnectingOrFailure() {

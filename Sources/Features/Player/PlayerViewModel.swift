@@ -103,6 +103,24 @@ final class PlayerViewModel: ObservableObject {
         Self.transport(for: state, isPaused: isPaused, hasStream: currentStream != nil)
     }
 
+    /// Whether a play/pause request means anything right now. Loading,
+    /// reconnecting and failed are not actionable: the glyph is derived from
+    /// the transport state, so toggling there would flip hidden state without
+    /// changing the icon, and would call pause() on a player that is still
+    /// opening or recovering.
+    nonisolated static func canTogglePlayPause(_ transport: Transport) -> Bool {
+        switch transport {
+        case .playing, .paused, .buffering:
+            return true
+        case .unavailable, .loading, .reconnecting, .failed:
+            return false
+        }
+    }
+
+    var canTogglePlayPause: Bool {
+        Self.canTogglePlayPause(transport)
+    }
+
     /// User-requested pause. Never set from engine events: VLC reports
     /// .paused for its own reasons mid-reconnect, and inheriting that would
     /// leave the UI claiming a pause the user never asked for.
@@ -113,7 +131,9 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func setPaused(_ paused: Bool) {
-        guard currentStream != nil else { return }
+        // Guarded here as well as in the UI: the tvOS remote's play/pause
+        // button reaches this without going through the control bar at all.
+        guard canTogglePlayPause else { return }
         isPaused = paused
         if paused {
             player.pause()

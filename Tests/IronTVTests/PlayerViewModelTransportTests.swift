@@ -19,7 +19,11 @@ final class PlayerViewModelTransportTests: XCTestCase {
         let viewModel = makeViewModel()
         viewModel.primeForReconnectTesting(
             stream: stream,
-            url: URL(string: "http://example.test/live/u/p/7.m3u8")!,
+            // Inert on purpose. This test needs a URL, not a credential
+            // layout: scripts/secret-scan.sh flags `/live/{user}/{pass}/` in
+            // tracked files unless the host is one of its allowlisted
+            // example domains, and there is no reason to rely on that here.
+            url: URL(string: "http://host.example.com/stream/7.m3u8")!,
             tsURL: nil,
             settings: PlaybackSettings.default,
             state: .playing
@@ -45,6 +49,26 @@ final class PlayerViewModelTransportTests: XCTestCase {
         viewModel.togglePlayPause()
         XCTAssertFalse(viewModel.isPaused)
         XCTAssertEqual(viewModel.transport, .playing)
+    }
+
+    /// The tvOS remote reaches `setPaused` without going through the control
+    /// bar, so the guard has to live in the view model too — not only in the
+    /// button's `disabled`.
+    @MainActor
+    func testPauseIsIgnoredWhileReconnecting() {
+        let viewModel = primed()
+        viewModel.primeForReconnectTesting(
+            stream: stream,
+            url: URL(string: "http://host.example.com/stream/7.m3u8")!,
+            tsURL: nil,
+            settings: PlaybackSettings.default,
+            state: .reconnecting
+        )
+
+        viewModel.togglePlayPause()
+
+        XCTAssertFalse(viewModel.isPaused, "a recovering session must not be paused behind the user's back")
+        XCTAssertEqual(viewModel.transport, .reconnecting)
     }
 
     /// Without a stream there is nothing to pause, and a latched `isPaused`
