@@ -744,8 +744,14 @@ final class PlayerViewModel: ObservableObject {
         player.media = media
         player.delegate = vlcProxy
         vlcPlayer = player
+        // Twice on purpose. VLCAudio hangs off the audio output, which does
+        // not exist until playback starts, so a mute applied only before
+        // play() is dropped and the channel comes back loud; one applied only
+        // after it leaves a brief window of sound. Setting it either side is
+        // cheap and closes both.
         applyMute()
         player.play()
+        applyMute()
     }
 
     /// True while a session is actually running — the only states from which
