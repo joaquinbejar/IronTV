@@ -76,7 +76,19 @@ struct AccountSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                playlistURLField
+                Picker("How your provider gave you the details", selection: $viewModel.inputMode) {
+                    Text("Playlist URL").tag(SettingsViewModel.InputMode.pastedURL)
+                    Text("Separate details").tag(SettingsViewModel.InputMode.separateFields)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("settings.inputModePicker")
+
+                switch viewModel.inputMode {
+                case .pastedURL:
+                    playlistURLField
+                case .separateFields:
+                    separateCredentialFields
+                }
 
                 HStack {
                     Button("Validate & Save", action: submit)
@@ -87,8 +99,17 @@ struct AccountSettingsTab: View {
             } header: {
                 Text("Account")
             } footer: {
-                Text("Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.")
-                    .foregroundStyle(.secondary)
+                // Two footers rather than one that covers both: the URL note is
+                // about what IronTV does NOT do with the playlist, which makes
+                // no sense next to three hand-typed fields.
+                switch viewModel.inputMode {
+                case .pastedURL:
+                    Text("Paste the M3U playlist URL from your provider. IronTV only extracts the server and credentials from it — the playlist itself is never downloaded. The URL contains your password, so it is hidden while you type and cleared once the account is saved.")
+                        .foregroundStyle(.secondary)
+                case .separateFields:
+                    Text("Use this when your provider gave you the server, username and password separately. The address takes the form host.example.com or host.example.com:8080. Your password is hidden while you type and cleared once the account is saved.")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if let account = appModel.account {
@@ -164,6 +185,48 @@ struct AccountSettingsTab: View {
 
             revealToggle
         }
+    }
+
+    /// Host, username and password as three controls plus an explicit scheme.
+    /// Nothing here is parsed out of a query string: the values arrive already
+    /// separated, which is the whole point of this mode.
+    @ViewBuilder
+    private var separateCredentialFields: some View {
+        Picker("Connection", selection: $viewModel.scheme) {
+            Text("HTTPS").tag(TransportScheme.https)
+            Text("HTTP").tag(TransportScheme.http)
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("settings.schemePicker")
+
+        TextField("Server address", text: $viewModel.hostText, prompt: Text("host.example.com:8080"))
+            .autocorrectionDisabled()
+            #if os(iOS) || os(tvOS)
+            .textInputAutocapitalization(.never)
+            .keyboardType(.URL)
+            #endif
+            .accessibilityIdentifier("settings.hostField")
+            .onSubmit(submit)
+
+        TextField("Username", text: $viewModel.usernameText)
+            .autocorrectionDisabled()
+            #if os(iOS) || os(tvOS)
+            .textInputAutocapitalization(.never)
+            .textContentType(.username)
+            #endif
+            .accessibilityIdentifier("settings.usernameField")
+            .onSubmit(submit)
+
+        // Always obscured: unlike the pasted URL there is no reveal here,
+        // because the other two fields already show what account this is.
+        SecureField("Password", text: $viewModel.passwordText)
+            .autocorrectionDisabled()
+            #if os(iOS) || os(tvOS)
+            .textInputAutocapitalization(.never)
+            .textContentType(.password)
+            #endif
+            .accessibilityIdentifier("settings.passwordField")
+            .onSubmit(submit)
     }
 
     @ViewBuilder
