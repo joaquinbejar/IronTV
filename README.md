@@ -144,8 +144,23 @@ Tests/             # unit tests + JSON fixtures (Int/String variants, real panel
 
 Xtream panels are PHP-backed and inconsistent — every numeric DTO field decodes from both `Int` and `String` (`@FlexibleInt` / `@FlexibleString`).
 
+## Contact
+
+### **Contact Information**
+- **Author**: Joaquín Béjar García
+- **Email**: jb@taunais.com
+- **Telegram**: [@joaquin_bejar](https://t.me/joaquin_bejar)
+- **Repository**: <https://github.com/joaquinbejar/IronTV>
+
 ## Disclaimer
 
 IronTV is a player. It ships with no content, no playlists, and no services; you supply the subscription URL from your own provider and are solely responsible for what you access with it. See [LICENSE](LICENSE).
 
 © 2026 Joaquin Bejar. Free for personal use; redistribution and modification are not permitted.
+
+<!-- related-projects:start -->
+## Related projects
+
+No other repositories by the same author depend on this project, and it depends on none of them. See all repositories at <https://github.com/joaquinbejar?tab=repositories>.
+
+<!-- related-projects:end -->
